@@ -190,7 +190,7 @@ export function TreeBrowser({
           {/* العضو المركز — بطاقة بارزة */}
           <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">
             {/* رأس بتدرج: زر الأب + صورة + اسم */}
-            <div className="bg-gradient-to-br from-[#10B981] to-[#059669] px-4 pt-4 pb-5 relative flex flex-col items-center gap-3">
+            <div className="bg-gradient-to-br from-[#ECFDF5] to-[#D1FAE5] px-4 pt-4 pb-5 relative flex flex-col items-center gap-3">
               {canModerate && (
                 <div className="absolute top-3 left-3">
                   <MemberFullEditClient
@@ -205,14 +205,14 @@ export function TreeBrowser({
               {focused.father_id && byId.get(focused.father_id) && (
                 <button
                   onClick={() => focus(focused.father_id!)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#10B981]/15 hover:bg-[#10B981]/25 text-[#059669] text-xs font-bold transition"
                 >
                   <span>👨</span>
                   <span>ابن {byId.get(focused.father_id)!.first_name}</span>
                 </button>
               )}
               {/* الصورة */}
-              <div className="w-20 h-20 rounded-2xl bg-white/20 ring-4 ring-white/40 text-white flex items-center justify-center text-3xl font-black shadow-lg overflow-hidden flex-shrink-0">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] ring-4 ring-white text-white flex items-center justify-center text-3xl font-black shadow-lg overflow-hidden flex-shrink-0">
                 {focused.avatar_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={focused.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -221,7 +221,7 @@ export function TreeBrowser({
                 )}
               </div>
               {/* الاسم داخل الرأس */}
-              <h2 className="text-lg font-black text-white leading-tight text-center drop-shadow-sm">
+              <h2 className="text-lg font-black text-[#0F172A] leading-tight text-center">
                 {focused.full_name}
               </h2>
             </div>
