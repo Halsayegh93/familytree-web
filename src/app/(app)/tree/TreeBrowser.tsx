@@ -190,7 +190,7 @@ export function TreeBrowser({
           {/* العضو المركز — بطاقة بارزة */}
           <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">
             {/* رأس بتدرج: زر الأب + صورة + اسم */}
-            <div className="bg-gradient-to-br from-[#ECFDF5] to-[#D1FAE5] px-4 pt-4 pb-5 relative flex flex-col items-center gap-3">
+            <div className="bg-gradient-to-br from-[#ECFDF5] to-[#D1FAE5] px-4 pt-3 pb-3 relative flex flex-col items-center gap-2">
               {canModerate && (
                 <div className="absolute top-3 left-3">
                   <MemberFullEditClient
@@ -212,7 +212,7 @@ export function TreeBrowser({
                 </button>
               )}
               {/* الصورة */}
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] ring-4 ring-white text-white flex items-center justify-center text-3xl font-black shadow-lg overflow-hidden flex-shrink-0">
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#10B981] to-[#059669] ring-2 ring-white text-white flex items-center justify-center text-2xl font-black shadow-md overflow-hidden flex-shrink-0">
                 {focused.avatar_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={focused.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -221,13 +221,13 @@ export function TreeBrowser({
                 )}
               </div>
               {/* الاسم داخل الرأس */}
-              <h2 className="text-lg font-black text-[#0F172A] leading-tight text-center">
+              <h2 className="text-base font-black text-[#0F172A] leading-tight text-center">
                 {focused.full_name}
               </h2>
             </div>
 
             {/* الشارات والمعلومات */}
-            <div className="px-4 py-3 flex flex-wrap justify-center gap-1.5">
+            <div className="px-3 py-2 flex flex-wrap justify-center gap-1">
               <span className="px-2.5 py-0.5 bg-[#10B981]/15 text-[#10B981] rounded-full text-[10px] font-black">
                 {roleAr(focused.role)}
               </span>
