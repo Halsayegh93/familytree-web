@@ -183,11 +183,13 @@ export default function LoginPage() {
               {loading ? "⏳ جاري الدخول..." : "دخول 🔓"}
             </button>
 
-            {/* رابط التسجيل */}
-            <div className="text-center pt-1">
-              <span className="text-sm text-[#64748B]">ليس لديك حساب؟ </span>
+            {/* روابط */}
+            <div className="flex items-center justify-between pt-1">
               <Link href="/register" className="text-sm font-bold text-[#357DED] hover:underline">
-                سجّل الآن
+                تسجيل جديد
+              </Link>
+              <Link href="/reset-password" className="text-sm text-[#94A3B8] hover:text-[#357DED] font-semibold">
+                نسيت كلمة السر؟
               </Link>
             </div>
           </form>

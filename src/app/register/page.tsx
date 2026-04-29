@@ -99,14 +99,14 @@ export default function RegisterPage() {
     // محاولة update أولاً (لو trigger خلق الصف تلقائياً)
     const { error: updateErr } = await supabase
       .from("profiles")
-      .update(profileData)
+      .update({ ...profileData, registration_platform: "web", username: username.trim().toLowerCase() })
       .eq("id", userId);
 
     // لو فشل الـ update أو ما عنده صلاحية، جرّب insert
     if (updateErr) {
       const { error: insertErr } = await supabase
         .from("profiles")
-        .insert({ id: userId, ...profileData });
+        .insert({ id: userId, ...profileData, registration_platform: "web", username: username.trim().toLowerCase() });
 
       if (insertErr) {
         await supabase.auth.signOut();
