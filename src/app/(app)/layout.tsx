@@ -21,9 +21,12 @@ export default async function AppLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, is_hr_member")
+    .select("role, status, is_hr_member")
     .eq("id", profileId!)
     .single();
+
+  // عضو معلق — وجّهه لصفحة الانتظار
+  if (profile?.status === "pending") redirect("/pending");
 
   const canModerate = MODERATOR_ROLES.includes(profile?.role ?? "");
   const isHR = profile?.is_hr_member === true;
