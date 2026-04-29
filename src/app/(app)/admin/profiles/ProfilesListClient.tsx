@@ -213,10 +213,10 @@ export function ProfilesListClient({
 
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <StatCard icon="👥" value={counts.all}      label="إجمالي الأعضاء" color="#357DED" />
         <StatCard icon="✅" value={counts.living}   label="أحياء"          color="#10B981" />
         <StatCard icon="🕊️" value={counts.deceased} label="متوفون"         color="#6B7B8D" />
@@ -269,7 +269,7 @@ export function ProfilesListClient({
 
       {/* Grid view */}
       {filtered.length > 0 && view === "grid" && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
           {visible.map((m) => (
             <Link
               key={m.id}
@@ -294,7 +294,7 @@ export function ProfilesListClient({
       {filtered.length > 0 && view === "list" && (
         <div className="bg-white rounded-2xl border border-[#E2E8F0] divide-y divide-[#F1F5F9] overflow-hidden">
           {visible.map((m) => (
-            <div key={m.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[#F8FAFC] transition">
+            <div key={m.id} className="flex items-center gap-3 px-3 py-2 hover:bg-[#F8FAFC] transition">
               <Link
                 href={`/admin/profiles/${m.id}`}
                 className="flex items-center gap-3 flex-1 min-w-0"
