@@ -5,6 +5,20 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 
+const COUNTRIES = [
+  { code: "+965", flag: "🇰🇼", name: "الكويت" },
+  { code: "+966", flag: "🇸🇦", name: "السعودية" },
+  { code: "+971", flag: "🇦🇪", name: "الإمارات" },
+  { code: "+974", flag: "🇶🇦", name: "قطر" },
+  { code: "+973", flag: "🇧🇭", name: "البحرين" },
+  { code: "+968", flag: "🇴🇲", name: "عُمان" },
+  { code: "+20",  flag: "🇪🇬", name: "مصر" },
+  { code: "+962", flag: "🇯🇴", name: "الأردن" },
+  { code: "+964", flag: "🇮🇶", name: "العراق" },
+  { code: "+1",   flag: "🇺🇸", name: "أمريكا" },
+  { code: "+44",  flag: "🇬🇧", name: "بريطانيا" },
+];
+
 export default function RegisterPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -13,6 +27,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [fullName, setFullName] = useState("");
+  const [countryCode, setCountryCode] = useState("+965");
   const [phone, setPhone] = useState("");
   const [birth, setBirth] = useState("");
 
@@ -28,11 +43,20 @@ export default function RegisterPage() {
 
   const passwordMatch = confirm.length > 0 && password !== confirm;
   const passwordShort = password.length > 0 && password.length < 6;
+  const canSubmit =
+    !loading &&
+    username.trim().length > 0 &&
+    password.length >= 6 &&
+    confirm.length > 0 &&
+    !passwordMatch &&
+    fullName.trim().length > 0 &&
+    phone.trim().length > 0 &&
+    birth.length > 0;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (password !== confirm) { setError("كلمتا السر غير متطابقتين"); return; }
-    if (password.length < 6) { setError("كلمة السر يجب أن تكون 6 أحرف على الأقل"); return; }
+    if (password.length < 6)  { setError("كلمة السر يجب أن تكون 6 أحرف على الأقل"); return; }
 
     setLoading(true);
     setError(null);
@@ -41,25 +65,29 @@ export default function RegisterPage() {
 
     const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({ email, password });
     if (signUpErr || !signUpData.user) {
-      setError(signUpErr?.message?.includes("already") ? "اسم المستخدم مستخدم مسبقاً" : (signUpErr?.message ?? "خطأ في التسجيل"));
+      setError(
+        signUpErr?.message?.includes("already")
+          ? "اسم المستخدم مستخدم مسبقاً"
+          : (signUpErr?.message ?? "خطأ في التسجيل")
+      );
       setLoading(false);
       return;
     }
 
     const userId = signUpData.user.id;
     const cleanedPhone = normalizeDigits(phone);
-    const finalPhone = cleanedPhone ? (cleanedPhone.startsWith("965") ? `+${cleanedPhone}` : `+965${cleanedPhone}`) : null;
+    const finalPhone = cleanedPhone ? `${countryCode}${cleanedPhone}` : null;
     const nameParts = fullName.trim().split(" ");
 
-    const { error: profileErr } = await supabase.from("profiles").insert({
+    const { error: profileErr } = await supabase.from("profiles").upsert({
       id: userId,
       first_name: nameParts[0] ?? fullName.trim(),
       full_name: fullName.trim(),
       phone_number: finalPhone,
-      birth_date: birth || null,
+      birth_date: birth,
       role: "member",
       status: "pending",
-    });
+    }, { onConflict: "id" });
 
     if (profileErr) {
       await supabase.auth.signOut();
@@ -72,8 +100,10 @@ export default function RegisterPage() {
     router.refresh();
   }
 
+  const selectedCountry = COUNTRIES.find((c) => c.code === countryCode)!;
+
   return (
-    <main className="min-h-screen flex items-center justify-center p-4 bg-[#F8FAFC]">
+    <main className="min-h-screen flex items-center justify-center p-4 py-10 bg-[#F8FAFC]">
       <div className="w-full max-w-md space-y-4">
 
         {/* Header */}
@@ -97,32 +127,36 @@ export default function RegisterPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))}
                 placeholder="username"
-                className="input"
+                className="inp"
                 dir="ltr"
                 autoFocus
                 required
               />
             </Field>
 
-            <Field label="كلمة السر" hint={passwordShort ? "أقل من 6 أحرف" : undefined} hintColor="red">
+            <Field label="كلمة السر" hint={passwordShort ? "⚠️ أقل من 6 أحرف" : undefined} hintColor="red">
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="6 أحرف على الأقل"
-                className={`input ${passwordShort ? "ring-2 ring-[#EF4444]" : ""}`}
+                placeholder="••••••••"
+                className={`inp ${passwordShort ? "ring-2 ring-[#EF4444]" : ""}`}
                 dir="ltr"
                 required
               />
             </Field>
 
-            <Field label="تأكيد كلمة السر" hint={passwordMatch ? "كلمتا السر غير متطابقتين" : undefined} hintColor="red">
+            <Field
+              label="تأكيد كلمة السر"
+              hint={passwordMatch ? "⚠️ غير متطابقتين" : (confirm.length > 0 && !passwordMatch && password.length >= 6) ? "✓ متطابقتين" : undefined}
+              hintColor={passwordMatch ? "red" : "green"}
+            >
               <input
                 type="password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 placeholder="••••••••"
-                className={`input ${passwordMatch ? "ring-2 ring-[#EF4444]" : confirm.length > 0 && !passwordMatch ? "ring-2 ring-[#10B981]" : ""}`}
+                className={`inp ${passwordMatch ? "ring-2 ring-[#EF4444]" : (confirm.length > 0 && !passwordMatch && password.length >= 6) ? "ring-2 ring-[#10B981]" : ""}`}
                 dir="ltr"
                 required
               />
@@ -137,15 +171,27 @@ export default function RegisterPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="الاسم الكامل مع اسم الجد"
-                className="input"
+                className="inp"
                 required
               />
             </Field>
 
-            <Field label="رقم الهاتف (اختياري)">
+            <Field label="رقم الهاتف">
               <div className="flex gap-2" dir="ltr">
-                <div className="flex items-center gap-1 px-3 bg-[#F1F5F9] rounded-xl text-sm font-bold flex-shrink-0 border border-[#E2E8F0]">
-                  🇰🇼 +965
+                {/* Country picker */}
+                <div className="relative flex-shrink-0">
+                  <select
+                    value={countryCode}
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    className="inp appearance-none pr-2 pl-8 cursor-pointer"
+                    style={{ width: 110 }}
+                  >
+                    {COUNTRIES.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.flag} {c.code}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <input
                   type="tel"
@@ -153,17 +199,19 @@ export default function RegisterPage() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="XXXXXXXX"
-                  className="input flex-1"
+                  className="inp flex-1"
+                  required
                 />
               </div>
             </Field>
 
-            <Field label="تاريخ الميلاد (اختياري)">
+            <Field label="تاريخ الميلاد">
               <input
                 type="date"
                 value={birth}
                 onChange={(e) => setBirth(e.target.value)}
-                className="input"
+                className="inp"
+                required
               />
             </Field>
           </Section>
@@ -176,7 +224,7 @@ export default function RegisterPage() {
 
           <button
             type="submit"
-            disabled={loading || !username.trim() || !password || !confirm || !fullName.trim() || passwordMatch || passwordShort}
+            disabled={!canSubmit}
             className="w-full bg-gradient-to-r from-[#357DED] to-[#10B981] text-white py-4 rounded-2xl font-bold text-base shadow-lg disabled:opacity-40 active:scale-95 transition"
           >
             {loading ? "⏳ جاري التسجيل..." : "إنشاء الحساب ✨"}
@@ -193,7 +241,7 @@ export default function RegisterPage() {
       </div>
 
       <style jsx>{`
-        .input {
+        .inp {
           width: 100%;
           padding: 12px 16px;
           background: #F1F5F9;
@@ -205,7 +253,7 @@ export default function RegisterPage() {
           color: #0F172A;
           transition: box-shadow 0.15s;
         }
-        .input:focus {
+        .inp:focus {
           box-shadow: 0 0 0 2px #357DED40;
         }
       `}</style>
