@@ -188,11 +188,11 @@ export function TreeBrowser({
           )}
 
           {/* العضو المركز — بطاقة بارزة */}
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden shadow-sm">
-            {/* رأس البطاقة بتدرج */}
-            <div className="bg-gradient-to-br from-[#10B981] to-[#059669] px-4 pt-5 pb-10 relative">
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+            {/* رأس بتدرج: زر الأب + صورة + اسم */}
+            <div className="bg-gradient-to-br from-[#10B981] to-[#059669] px-4 pt-4 pb-5 relative flex flex-col items-center gap-3">
               {canModerate && (
-                <div className="absolute top-3 left-3 z-10">
+                <div className="absolute top-3 left-3">
                   <MemberFullEditClient
                     key={focused.id}
                     member={focused}
@@ -203,66 +203,58 @@ export function TreeBrowser({
               )}
               {/* رابط الأب */}
               {focused.father_id && byId.get(focused.father_id) && (
-                <div className="flex justify-center mb-3">
-                  <button
-                    onClick={() => focus(focused.father_id!)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition"
-                  >
-                    <span>👨</span>
-                    <span>ابن {byId.get(focused.father_id)!.first_name}</span>
-                  </button>
-                </div>
+                <button
+                  onClick={() => focus(focused.father_id!)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition"
+                >
+                  <span>👨</span>
+                  <span>ابن {byId.get(focused.father_id)!.first_name}</span>
+                </button>
               )}
-              {/* الصورة المركزية */}
-              <div className="flex justify-center">
-                <div className="w-20 h-20 rounded-2xl bg-white/20 ring-4 ring-white/40 text-white flex items-center justify-center text-3xl font-black shadow-lg overflow-hidden">
-                  {focused.avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={focused.avatar_url} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    focused.full_name.charAt(0)
-                  )}
-                </div>
+              {/* الصورة */}
+              <div className="w-20 h-20 rounded-2xl bg-white/20 ring-4 ring-white/40 text-white flex items-center justify-center text-3xl font-black shadow-lg overflow-hidden flex-shrink-0">
+                {focused.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={focused.avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  focused.full_name.charAt(0)
+                )}
               </div>
+              {/* الاسم داخل الرأس */}
+              <h2 className="text-lg font-black text-white leading-tight text-center drop-shadow-sm">
+                {focused.full_name}
+              </h2>
             </div>
 
-            {/* المحتوى — يرتفع فوق الرأس */}
-            <div className="-mt-6 px-4 pb-4">
-              <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm px-4 py-3 text-center">
-                <h2 className="text-lg font-black text-[#0F172A] leading-tight">
-                  {focused.full_name}
-                </h2>
-                {/* الشارات */}
-                <div className="flex flex-wrap justify-center gap-1.5 mt-2">
-                  <span className="px-2.5 py-0.5 bg-[#10B981] text-white rounded-full text-[10px] font-black">
-                    {roleAr(focused.role)}
-                  </span>
-                  {focused.is_deceased && (
-                    <span className="px-2.5 py-0.5 bg-[#6B7B8D]/15 text-[#6B7B8D] rounded-full text-[10px] font-bold">
-                      🕊️ متوفى
-                    </span>
-                  )}
-                  {focused.birth_date && (
-                    <span className="px-2.5 py-0.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-full text-[10px] font-semibold text-[#475569]">
-                      🎂 {focused.birth_date}
-                    </span>
-                  )}
-                  {focused.death_date && (
-                    <span className="px-2.5 py-0.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-full text-[10px] font-semibold text-[#475569]">
-                      🕊️ {focused.death_date}
-                    </span>
-                  )}
-                  {focused.phone_number && (
-                    <a
-                      href={`tel:${focused.phone_number}`}
-                      dir="ltr"
-                      className="px-2.5 py-0.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-full text-[10px] font-semibold text-[#475569] hover:bg-[#357DED] hover:text-white hover:border-[#357DED] transition"
-                    >
-                      📞 {formatPhone(focused.phone_number)}
-                    </a>
-                  )}
-                </div>
-              </div>
+            {/* الشارات والمعلومات */}
+            <div className="px-4 py-3 flex flex-wrap justify-center gap-1.5">
+              <span className="px-2.5 py-0.5 bg-[#10B981]/15 text-[#10B981] rounded-full text-[10px] font-black">
+                {roleAr(focused.role)}
+              </span>
+              {focused.is_deceased && (
+                <span className="px-2.5 py-0.5 bg-[#6B7B8D]/15 text-[#6B7B8D] rounded-full text-[10px] font-bold">
+                  🕊️ متوفى
+                </span>
+              )}
+              {focused.birth_date && (
+                <span className="px-2.5 py-0.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-full text-[10px] font-semibold text-[#475569]">
+                  🎂 {focused.birth_date}
+                </span>
+              )}
+              {focused.death_date && (
+                <span className="px-2.5 py-0.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-full text-[10px] font-semibold text-[#475569]">
+                  🕊️ {focused.death_date}
+                </span>
+              )}
+              {focused.phone_number && (
+                <a
+                  href={`tel:${focused.phone_number}`}
+                  dir="ltr"
+                  className="px-2.5 py-0.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-full text-[10px] font-semibold text-[#475569] hover:bg-[#357DED] hover:text-white hover:border-[#357DED] transition"
+                >
+                  📞 {formatPhone(focused.phone_number)}
+                </a>
+              )}
             </div>
           </div>
 
