@@ -265,7 +265,7 @@ export function TreeBrowser({
               icon="👨‍👦"
               color="#5438DC"
             >
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1">
                 {directChildren.map((c) => (
                   <NodeCard
                     key={c.id}
