@@ -63,37 +63,57 @@ export default function RegisterPage() {
 
     const email = `${username.trim().toLowerCase()}@familytree.local`;
 
+    let userId: string;
+
     const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({ email, password });
-    if (signUpErr || !signUpData.user) {
-      setError(
-        signUpErr?.message?.includes("already")
-          ? "اسم المستخدم مستخدم مسبقاً"
-          : (signUpErr?.message ?? "خطأ في التسجيل")
-      );
+
+    if (signUpErr?.message?.includes("already")) {
+      // الحساب موجود — جرّب الدخول وأكمل حفظ البيانات
+      const { data: loginData, error: loginErr } = await supabase.auth.signInWithPassword({ email, password });
+      if (loginErr || !loginData.user) {
+        setError("اسم المستخدم مستخدم مسبقاً — استخدم اسماً آخر");
+        setLoading(false);
+        return;
+      }
+      userId = loginData.user.id;
+    } else if (signUpErr || !signUpData.user) {
+      setError(signUpErr?.message ?? "خطأ في التسجيل");
       setLoading(false);
       return;
+    } else {
+      userId = signUpData.user.id;
     }
-
-    const userId = signUpData.user.id;
     const cleanedPhone = normalizeDigits(phone);
     const finalPhone = cleanedPhone ? `${countryCode}${cleanedPhone}` : null;
     const nameParts = fullName.trim().split(" ");
 
-    const { error: profileErr } = await supabase.from("profiles").upsert({
-      id: userId,
+    const profileData = {
       first_name: nameParts[0] ?? fullName.trim(),
       full_name: fullName.trim(),
       phone_number: finalPhone,
       birth_date: birth,
       role: "member",
       status: "pending",
-    }, { onConflict: "id" });
+    };
 
-    if (profileErr) {
-      await supabase.auth.signOut();
-      setError("خطأ في حفظ البيانات: " + profileErr.message);
-      setLoading(false);
-      return;
+    // محاولة update أولاً (لو trigger خلق الصف تلقائياً)
+    const { error: updateErr } = await supabase
+      .from("profiles")
+      .update(profileData)
+      .eq("id", userId);
+
+    // لو فشل الـ update أو ما عنده صلاحية، جرّب insert
+    if (updateErr) {
+      const { error: insertErr } = await supabase
+        .from("profiles")
+        .insert({ id: userId, ...profileData });
+
+      if (insertErr) {
+        await supabase.auth.signOut();
+        setError("خطأ في حفظ البيانات: " + insertErr.message);
+        setLoading(false);
+        return;
+      }
     }
 
     router.push("/pending");
