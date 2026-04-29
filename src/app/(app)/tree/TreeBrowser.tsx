@@ -110,7 +110,7 @@ export function TreeBrowser({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* شريط الأدوات — مبسّط */}
       <div data-tree-toolbar className="bg-white rounded-2xl border border-[#E2E8F0] p-3 flex flex-col md:flex-row gap-2 sticky top-14 z-30 shadow-sm">
         {/* البحث */}
