@@ -19,102 +19,109 @@ export default async function DiwaniyasPage() {
     .eq("approval_status", "approved")
     .order("created_at", { ascending: false });
 
+  const total  = diwaniyas?.length ?? 0;
+  const active = diwaniyas?.filter((d: any) => !d.is_closed).length ?? 0;
+  const closed = diwaniyas?.filter((d: any) => d.is_closed).length ?? 0;
+
   return (
     <PageBackground theme="diwaniyas">
       <main className="max-w-5xl mx-auto p-6 space-y-4">
+
         <PageHero
           theme="diwaniyas"
           title="ديوانيات العائلة"
-          subtitle={`مواعيد وأماكن الديوانيات — ${diwaniyas?.length ?? 0} ديوانية`}
+          subtitle={`مواعيد وأماكن الديوانيات — ${total} ديوانية`}
         />
 
+        {/* Stat Cards */}
+        <div className="grid grid-cols-3 gap-3">
+          <StatCard icon="🏛️" value={total}  label="إجمالي"   color="#5438DC" />
+          <StatCard icon="✅" value={active} label="نشطة"     color="#10B981" />
+          <StatCard icon="🚫" value={closed} label="مغلقة"    color="#EF4444" />
+        </div>
+
+        {/* Add button */}
         {profileId && (
           <div className="flex justify-end">
             <AddDiwaniyaButton ownerId={profileId} ownerName={viewer?.full_name ?? "—"} />
           </div>
         )}
 
-        {(!diwaniyas || diwaniyas.length === 0) && (
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-12 text-center">
+        {/* Empty state */}
+        {total === 0 && (
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-14 text-center">
             <div className="text-5xl mb-3">🏛️</div>
             <p className="text-[#64748B]">لا توجد ديوانيات حالياً</p>
           </div>
         )}
 
-        <div className="grid md:grid-cols-2 gap-4">
+        {/* Grid */}
+        <div className="grid md:grid-cols-2 gap-3">
           {diwaniyas?.map((d: any) => (
             <article
               key={d.id}
-              className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden hover:shadow-sm transition"
+              className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden hover:shadow-sm hover:-translate-y-0.5 transition"
             >
               {d.image_url && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={d.image_url} alt="" className="w-full h-32 object-cover" />
+                <img src={d.image_url} alt="" className="w-full h-28 object-cover" />
               )}
 
               <div className="p-4">
-                <div className="flex items-start gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-lg bg-[#F59E0B]/15 flex items-center justify-center text-xl flex-shrink-0">
+                {/* Header row */}
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#5438DC]/10 flex items-center justify-center text-lg flex-shrink-0">
                     🏛️
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h2 className="font-black text-sm text-[#0F172A] leading-tight">
+                    <h2 className="font-black text-sm text-[#0F172A] leading-tight truncate">
                       {d.title || d.name || "—"}
                     </h2>
                     {d.owner_name && (
-                      <div className="text-xs text-[#64748B] truncate">
-                        {d.owner_name}
-                      </div>
+                      <div className="text-xs text-[#64748B] truncate mt-0.5">{d.owner_name}</div>
                     )}
                     {d.is_closed && (
-                      <span className="inline-block mt-1 px-2 py-0.5 bg-[#EF4444]/15 text-[#EF4444] rounded-full text-xs font-bold">
+                      <span className="inline-block mt-1 px-2 py-0.5 bg-[#EF4444]/10 text-[#EF4444] rounded-full text-[10px] font-bold">
                         🚫 مغلقة
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* التفاصيل */}
-                <div className="space-y-2 text-sm">
+                {/* Details */}
+                <div className="space-y-1.5">
                   {(d.timing || d.schedule_text) && (
-                    <Row
-                      icon="🕐"
-                      label="المواعيد"
-                      value={d.timing || d.schedule_text}
-                    />
+                    <InfoRow icon="🕐" value={d.timing || d.schedule_text} />
                   )}
-                  {d.address && <Row icon="📍" label="العنوان" value={d.address} />}
+                  {d.address && <InfoRow icon="📍" value={d.address} />}
                   {d.contact_phone && (
-                    <Row
-                      icon="📞"
-                      label="للتواصل"
-                      value={formatPhone(d.contact_phone)}
-                      dir="ltr"
-                    />
+                    <InfoRow icon="📞" value={formatPhone(d.contact_phone)} dir="ltr" />
                   )}
                 </div>
 
-                {/* الأزرار */}
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {(d.maps_url || d.location_url) && (
-                    <a
-                      href={d.maps_url || d.location_url}
-                      target="_blank"
-                      rel="noopener"
-                      className="inline-flex items-center gap-1 px-4 py-2 bg-[#D97706] text-white rounded-xl font-bold text-sm hover:opacity-90"
-                    >
-                      🗺️ فتح بالخرائط
-                    </a>
-                  )}
-                  {d.contact_phone && (
-                    <a
-                      href={`tel:${d.contact_phone}`}
-                      className="inline-flex items-center gap-1 px-4 py-2 bg-[#10B981] text-white rounded-xl font-bold text-sm hover:opacity-90"
-                    >
-                      📞 اتصال
-                    </a>
-                  )}
-                </div>
+                {/* Actions */}
+                {(d.maps_url || d.location_url || d.contact_phone) && (
+                  <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-[#F1F5F9]">
+                    {(d.maps_url || d.location_url) && (
+                      <a
+                        href={d.maps_url || d.location_url}
+                        target="_blank"
+                        rel="noopener"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#5438DC] text-white rounded-xl font-bold text-xs hover:opacity-90 transition"
+                      >
+                        🗺️ الخرائط
+                      </a>
+                    )}
+                    {d.contact_phone && (
+                      <a
+                        href={`tel:${d.contact_phone}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#10B981] text-white rounded-xl font-bold text-xs hover:opacity-90 transition"
+                      >
+                        📞 اتصال
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             </article>
           ))}
@@ -124,24 +131,28 @@ export default async function DiwaniyasPage() {
   );
 }
 
-function Row({
-  icon,
-  label,
-  value,
-  dir,
-}: {
-  icon: string;
-  label: string;
-  value: string;
-  dir?: "ltr" | "rtl";
-}) {
+function StatCard({ icon, value, label, color }: { icon: string; value: number; label: string; color: string }) {
   return (
-    <div className="flex items-start gap-2 leading-relaxed">
-      <span className="flex-shrink-0">{icon}</span>
-      <span className="text-[#64748B] flex-shrink-0">{label}:</span>
-      <span className="font-bold text-[#0F172A] flex-1" dir={dir}>
-        {value}
-      </span>
+    <div className="bg-white rounded-xl border border-[#E2E8F0] p-3 flex items-center gap-2.5 hover:shadow-sm hover:-translate-y-0.5 transition">
+      <div
+        className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+        style={{ background: `${color}15`, color }}
+      >
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-lg font-black text-[#0F172A] leading-tight">{value}</div>
+        <div className="text-xs text-[#64748B] truncate">{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function InfoRow({ icon, value, dir }: { icon: string; value: string; dir?: "ltr" | "rtl" }) {
+  return (
+    <div className="flex items-start gap-2 text-xs">
+      <span className="flex-shrink-0 mt-0.5">{icon}</span>
+      <span className="text-[#475569] flex-1 leading-relaxed" dir={dir}>{value}</span>
     </div>
   );
 }
