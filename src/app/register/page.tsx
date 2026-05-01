@@ -92,7 +92,7 @@ export default function RegisterPage() {
       full_name: fullName.trim(),
       phone_number: finalPhone,
       birth_date: birth,
-      role: "member",
+      role: "pending",
       status: "pending",
     };
 
