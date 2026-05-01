@@ -425,7 +425,7 @@ function FocusedMemberCard({
             <LabelPill label="الذرّية" icon="🌳" value={String(totalDescendants)} color="#10B981" />
             {member.is_deceased ? (
               member.death_date && (
-                <LabelPill label="الوفاة" icon="🕊️" value={formatDate(member.death_date)} color="#6B7B8D" />
+                <LabelPill label="الوفاة" value={formatDate(member.death_date)} color="#6B7B8D" />
               )
             ) : (
               <>
@@ -460,7 +460,7 @@ function LabelPill({
   color,
 }: {
   label: string;
-  icon: string;
+  icon?: string;
   value: string;
   color: string;
 }) {
@@ -470,7 +470,7 @@ function LabelPill({
       style={{ background: `${color}18`, color }}
     >
       <span className="opacity-80">{label}:</span>
-      <span>{icon}</span>
+      {icon && <span>{icon}</span>}
       <span>{value}</span>
     </span>
   );
