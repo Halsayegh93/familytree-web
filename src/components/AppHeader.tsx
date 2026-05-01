@@ -82,7 +82,7 @@ export function AppHeader({
         {/* Spacer للموبايل (يدفع الإشعارات + الخروج) */}
         <div className="md:hidden flex-1" />
 
-        {/* الإشعارات — تظهر دائماً للمدراء */}
+        {/* الإشعارات — تظهر لكل المستخدمين */}
         <NotificationBell canModerate={canModerate} isHR={isHR} />
 
         {/* Logout */}

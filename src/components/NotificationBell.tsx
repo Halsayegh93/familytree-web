@@ -1,191 +1,77 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { notificationMeta } from "@/lib/notification-router";
 
-type Notification = {
+type NotificationRow = {
   id: string;
-  type: "member" | "project" | "diwaniya" | "hr_note" | "hr_contact" | "hr_doc";
   title: string;
-  description?: string;
-  date: string;
-  href: string;
-  icon: string;
-  color: string;
-  isNew: boolean;
+  body: string | null;
+  kind: string;
+  created_at: string;
+  is_read: boolean;
+  created_by: string | null;
+  target_member_id: string;
 };
-
-const STORAGE_KEY = "lastSeenNotifications";
 
 export function NotificationBell({
   canModerate,
-  isHR,
 }: {
   canModerate: boolean;
-  isHR: boolean;
+  isHR?: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [lastSeen, setLastSeen] = useState<number>(0);
+  const [items, setItems] = useState<NotificationRow[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
-  // قراءة آخر زيارة
+  // المستخدم الحالي
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    setLastSeen(stored ? parseInt(stored) : 0);
-  }, []);
+    supabase.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id ?? null);
+    });
+  }, [supabase]);
 
-  // جلب البيانات الأولية + الاشتراك بالـ realtime
+  // جلب الإشعارات + اشتراك realtime
   useEffect(() => {
-    if (!canModerate) return;
+    if (!userId) return;
 
     async function load() {
-      const since = new Date();
-      since.setDate(since.getDate() - 7);
-      const sinceIso = since.toISOString();
+      const { data } = await supabase
+        .from("notifications")
+        .select("id, title, body, kind, created_at, is_read, created_by, target_member_id")
+        .eq("target_member_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(40);
 
-      const queries: any[] = [
-        supabase
-          .from("profiles")
-          .select("id, full_name, phone_number, created_at")
-          .eq("role", "pending")
-          .gte("created_at", sinceIso)
-          .order("created_at", { ascending: false })
-          .then((r: any) => r),
-        supabase
-          .from("projects")
-          .select("id, title, owner_name, approval_status, created_at")
-          .gte("created_at", sinceIso)
-          .order("created_at", { ascending: false })
-          .then((r: any) => r),
-        supabase
-          .from("diwaniyas")
-          .select("id, title, name, owner_name, created_at")
-          .gte("created_at", sinceIso)
-          .order("created_at", { ascending: false })
-          .then((r: any) => r),
-      ];
-
-      if (isHR) {
-        queries.push(
-          supabase
-            .from("hr_notes")
-            .select("id, member_id, note, created_at, profiles!hr_notes_member_id_fkey(full_name)")
-            .gte("created_at", sinceIso)
-            .order("created_at", { ascending: false })
-            .then((r: any) => r)
-        );
-        queries.push(
-          supabase
-            .from("hr_contact_log")
-            .select("id, member_id, reason, contacted_at, profiles!hr_contact_log_member_id_fkey(full_name)")
-            .gte("contacted_at", sinceIso)
-            .order("contacted_at", { ascending: false })
-            .then((r: any) => r)
-        );
-      }
-
-      const results: any[] = await Promise.all(queries);
-      const items: Notification[] = [];
-
-      results[0]?.data?.forEach((m: any) => {
-        if (!m.full_name) return;
-        items.push({
-          id: `pm-${m.id}`,
-          type: "member",
-          title: `طلب انضمام: ${m.full_name}`,
-          description: m.phone_number ? `📞 ${m.phone_number}` : undefined,
-          date: m.created_at,
-          href: "/admin/pending-members",
-          icon: "👤",
-          color: "#F59E0B",
-          isNew: new Date(m.created_at).getTime() > lastSeen,
-        });
-      });
-
-      results[1]?.data?.forEach((p: any) => {
-        items.push({
-          id: `proj-${p.id}`,
-          type: "project",
-          title: `مشروع: ${p.title}`,
-          description: `${p.owner_name} · ${p.approval_status === "pending" ? "ينتظر موافقة" : "منشور"}`,
-          date: p.created_at,
-          href: p.approval_status === "pending" ? "/admin/pending-projects" : "/projects",
-          icon: "💼",
-          color: "#06B6D4",
-          isNew: new Date(p.created_at).getTime() > lastSeen,
-        });
-      });
-
-      results[2]?.data?.forEach((d: any) => {
-        items.push({
-          id: `diw-${d.id}`,
-          type: "diwaniya",
-          title: `ديوانية: ${d.title || d.name}`,
-          description: d.owner_name,
-          date: d.created_at,
-          href: "/diwaniyas",
-          icon: "🏛️",
-          color: "#D97706",
-          isNew: new Date(d.created_at).getTime() > lastSeen,
-        });
-      });
-
-      if (isHR) {
-        results[3]?.data?.forEach((n: any) => {
-          items.push({
-            id: `note-${n.id}`,
-            type: "hr_note",
-            title: `📝 ملاحظة على ${n.profiles?.full_name ?? "—"}`,
-            description: n.note?.slice(0, 60),
-            date: n.created_at,
-            href: `/admin/profiles/${n.member_id}`,
-            icon: "🔒",
-            color: "#5438DC",
-            isNew: new Date(n.created_at).getTime() > lastSeen,
-          });
-        });
-
-        results[4]?.data?.forEach((c: any) => {
-          items.push({
-            id: `cont-${c.id}`,
-            type: "hr_contact",
-            title: `📞 تواصل مع ${c.profiles?.full_name ?? "—"}`,
-            description: c.reason,
-            date: c.contacted_at,
-            href: `/admin/profiles/${c.member_id}`,
-            icon: "🔒",
-            color: "#3B82F6",
-            isNew: new Date(c.contacted_at).getTime() > lastSeen,
-          });
-        });
-      }
-
-      items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      setNotifications(items.slice(0, 30));
+      setItems((data ?? []) as NotificationRow[]);
     }
 
     load();
 
-    // اشتراك realtime
     const channel = supabase
-      .channel("notifications")
-      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "projects" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "diwaniyas" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "hr_notes" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "hr_contact_log" }, load)
+      .channel(`notifications-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notifications",
+          filter: `target_member_id=eq.${userId}`,
+        },
+        load
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canModerate, isHR, lastSeen]);
+  }, [userId, supabase]);
 
   // إغلاق عند الضغط خارج
   useEffect(() => {
@@ -198,29 +84,42 @@ export function NotificationBell({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  function markAllSeen() {
-    const now = Date.now();
-    localStorage.setItem(STORAGE_KEY, String(now));
-    setLastSeen(now);
-    setNotifications((prev) => prev.map((n) => ({ ...n, isNew: false })));
-  }
+  async function handleNotificationClick(n: NotificationRow) {
+    setOpen(false);
 
-  function handleOpen() {
-    setOpen(!open);
-    if (!open) {
-      // علّم الكل كمقروءة عند الفتح
-      setTimeout(markAllSeen, 1000);
+    // علّم كمقروء فوراً (optimistic)
+    if (!n.is_read) {
+      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)));
+      await supabase.from("notifications").update({ is_read: true }).eq("id", n.id);
     }
+
+    const meta = notificationMeta(n.kind, {
+      canModerate,
+      createdBy: n.created_by,
+      targetMemberId: n.target_member_id,
+    });
+
+    router.push(meta.href);
   }
 
-  if (!canModerate) return null;
+  async function markAllRead() {
+    if (!userId) return;
+    setItems((prev) => prev.map((x) => ({ ...x, is_read: true })));
+    await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("target_member_id", userId)
+      .eq("is_read", false);
+  }
 
-  const newCount = notifications.filter((n) => n.isNew).length;
+  if (!userId) return null;
+
+  const newCount = items.filter((n) => !n.is_read).length;
 
   return (
     <div ref={ref} className="relative flex-shrink-0">
       <button
-        onClick={handleOpen}
+        onClick={() => setOpen(!open)}
         className="relative w-9 h-9 rounded-lg bg-[#F1F5F9] hover:bg-[#357DED] hover:text-white flex items-center justify-center text-lg transition"
         title="الإشعارات"
       >
@@ -237,60 +136,94 @@ export function NotificationBell({
           <div className="px-4 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-between">
             <div>
               <h3 className="font-black text-sm text-[#0F172A]">🔔 الإشعارات</h3>
-              <p className="text-[10px] text-[#64748B]">آخر ٧ أيام</p>
+              <p className="text-[10px] text-[#64748B]">
+                {items.length > 0 ? `${items.length} إشعار` : "لا توجد إشعارات"}
+              </p>
             </div>
-            {newCount > 0 && (
-              <button
-                onClick={markAllSeen}
-                className="text-xs text-[#357DED] font-bold hover:underline"
+            <div className="flex items-center gap-2">
+              {newCount > 0 && (
+                <button
+                  onClick={markAllRead}
+                  className="text-xs text-[#357DED] font-bold hover:underline"
+                >
+                  علّم الكل مقروء
+                </button>
+              )}
+              <Link
+                href="/notifications"
+                onClick={() => setOpen(false)}
+                className="text-xs text-[#64748B] font-bold hover:text-[#357DED]"
+                title="عرض الكل"
               >
-                علّم الكل مقروء
-              </button>
-            )}
+                ↗
+              </Link>
+            </div>
           </div>
 
           <div className="max-h-96 overflow-y-auto divide-y divide-[#E2E8F0]">
-            {notifications.length === 0 ? (
+            {items.length === 0 ? (
               <div className="p-8 text-center">
                 <div className="text-4xl mb-2">🌱</div>
-                <p className="text-sm text-[#64748B]">لا يوجد نشاط جديد</p>
+                <p className="text-sm text-[#64748B]">لا يوجد إشعارات</p>
               </div>
             ) : (
-              notifications.map((n) => (
-                <Link
-                  key={n.id}
-                  href={n.href}
-                  onClick={() => setOpen(false)}
-                  className={`flex items-start gap-2.5 p-3 hover:bg-[#F8FAFC] transition ${
-                    n.isNew ? "bg-[#FEF9E7]/40" : ""
-                  }`}
-                >
-                  <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center text-base flex-shrink-0 relative"
-                    style={{ background: `${n.color}15`, color: n.color }}
+              items.slice(0, 15).map((n) => {
+                const meta = notificationMeta(n.kind, {
+                  canModerate,
+                  createdBy: n.created_by,
+                  targetMemberId: n.target_member_id,
+                });
+                return (
+                  <button
+                    key={n.id}
+                    onClick={() => handleNotificationClick(n)}
+                    className={`w-full text-right flex items-start gap-2.5 p-3 hover:bg-[#F8FAFC] transition ${
+                      !n.is_read ? "bg-[#FEF9E7]/40" : ""
+                    }`}
                   >
-                    {n.icon}
-                    {n.isNew && (
-                      <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#EF4444]" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-xs text-[#0F172A] truncate">
-                      {n.title}
+                    <div
+                      className="w-9 h-9 rounded-lg flex items-center justify-center text-base flex-shrink-0 relative"
+                      style={{ background: `${meta.color}15`, color: meta.color }}
+                    >
+                      {meta.icon}
+                      {!n.is_read && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#EF4444]" />
+                      )}
                     </div>
-                    {n.description && (
-                      <div className="text-[10px] text-[#64748B] truncate mt-0.5">
-                        {n.description}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-xs text-[#0F172A] truncate">
+                        {n.title}
                       </div>
-                    )}
-                    <div className="text-[10px] text-[#94A3B8] mt-0.5">
-                      {timeAgo(n.date)}
+                      {n.body && (
+                        <div className="text-[10px] text-[#64748B] line-clamp-2 mt-0.5">
+                          {n.body}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[9px] font-bold" style={{ color: meta.color }}>
+                          {meta.labelAr}
+                        </span>
+                        <span className="text-[9px] text-[#94A3B8]">·</span>
+                        <span className="text-[10px] text-[#94A3B8]">
+                          {timeAgo(n.created_at)}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              ))
+                  </button>
+                );
+              })
             )}
           </div>
+
+          {items.length > 15 && (
+            <Link
+              href="/notifications"
+              onClick={() => setOpen(false)}
+              className="block px-4 py-2.5 text-center text-sm font-bold text-[#357DED] hover:bg-[#F8FAFC] border-t border-[#E2E8F0]"
+            >
+              عرض الكل ({items.length}) ←
+            </Link>
+          )}
         </div>
       )}
     </div>
