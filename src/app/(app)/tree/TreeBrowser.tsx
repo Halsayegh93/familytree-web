@@ -5,8 +5,6 @@ import { MemberFullEditClient } from "@/app/(app)/admin/profiles/[id]/MemberFull
 import { formatPhone } from "@/lib/format-phone";
 import Link from "next/link";
 
-type BioStation = { year?: string; title?: string; details?: string };
-
 type Member = {
   id: string;
   first_name: string;
@@ -20,9 +18,6 @@ type Member = {
   death_date: string | null;
   phone_number: string | null;
   sort_order: number | null;
-  gender?: string | null;
-  is_married?: boolean | null;
-  bio_json?: BioStation[] | null;
 };
 
 export function TreeBrowser({
@@ -374,10 +369,34 @@ function FocusedMemberCard({
           </h2>
           <div className="flex flex-wrap items-center gap-1 mt-1">
             <Pill color={roleColor}>⭐ {roleAr(member.role)}</Pill>
-            {member.is_deceased && <Pill color="#6B7B8D">🕊️ متوفى</Pill>}
             <Pill color="#F59E0B">📍 الجيل {generation + 1}</Pill>
-            <Pill color="#5438DC">👨‍👦 {childrenCount} أبناء</Pill>
-            <Pill color="#10B981">🌳 {totalDescendants} ذرّية</Pill>
+            <Pill color="#5438DC">👨‍👦 {childrenCount}</Pill>
+            <Pill color="#10B981">🌳 {totalDescendants}</Pill>
+            {/* المتوفى: تاريخ الوفاة فقط */}
+            {member.is_deceased ? (
+              <>
+                <Pill color="#6B7B8D">🕊️ متوفى</Pill>
+                {member.death_date && (
+                  <Pill color="#6B7B8D">🕊️ {formatDate(member.death_date)}</Pill>
+                )}
+              </>
+            ) : (
+              <>
+                {/* الأحياء: هاتف + ميلاد */}
+                {member.phone_number && (
+                  <a
+                    href={`tel:${member.phone_number}`}
+                    dir="ltr"
+                    className="inline-flex items-center gap-0.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[#357DED]/15 text-[#357DED] hover:bg-[#357DED] hover:text-white transition"
+                  >
+                    📞 {formatPhone(member.phone_number)}
+                  </a>
+                )}
+                {member.birth_date && (
+                  <Pill color="#EC4899">🎂 {formatDate(member.birth_date)}</Pill>
+                )}
+              </>
+            )}
           </div>
         </div>
 
@@ -403,145 +422,8 @@ function FocusedMemberCard({
         </div>
       </div>
 
-      {/* البيانات الشخصية */}
-      {member.is_deceased ? (
-        // المتوفى — لا نعرض هاتف/ميلاد، فقط وفاة + جنس + حالة اجتماعية
-        (member.death_date || member.gender || member.is_married !== null) && (
-          <div className="px-4 py-2.5 grid grid-cols-2 gap-2">
-            {member.death_date && (
-              <DataField label="الوفاة" icon="🕊️" value={formatDate(member.death_date)} color="#6B7B8D" />
-            )}
-            {member.gender && (
-              <DataField label="الجنس" icon={genderIcon(member.gender)} value={genderLabel(member.gender)} color="#06B6D4" />
-            )}
-            {member.is_married !== null && member.is_married !== undefined && (
-              <DataField
-                label="الحالة"
-                icon={member.is_married ? "💍" : "👤"}
-                value={member.is_married ? "متزوج" : "أعزب"}
-                color={member.is_married ? "#EC4899" : "#94A3B8"}
-              />
-            )}
-          </div>
-        )
-      ) : (
-        <div className="px-4 py-2.5 grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {member.phone_number ? (
-            <DataField
-              label="الهاتف"
-              icon="📞"
-              value={formatPhone(member.phone_number)}
-              color="#357DED"
-              href={`tel:${member.phone_number}`}
-              dir="ltr"
-            />
-          ) : (
-            <DataField label="الهاتف" icon="📞" value="—" color="#94A3B8" muted />
-          )}
-          {member.birth_date ? (
-            <DataField label="الميلاد" icon="🎂" value={formatDate(member.birth_date)} color="#EC4899" />
-          ) : (
-            <DataField label="الميلاد" icon="🎂" value="—" color="#94A3B8" muted />
-          )}
-          {member.gender && (
-            <DataField label="الجنس" icon={genderIcon(member.gender)} value={genderLabel(member.gender)} color="#06B6D4" />
-          )}
-          {member.is_married !== null && member.is_married !== undefined && (
-            <DataField
-              label="الحالة الاجتماعية"
-              icon={member.is_married ? "💍" : "👤"}
-              value={member.is_married ? "متزوج" : "أعزب"}
-              color={member.is_married ? "#EC4899" : "#94A3B8"}
-            />
-          )}
-        </div>
-      )}
-
-      {/* السيرة (Bio) إذا فيها محطات */}
-      {member.bio_json && member.bio_json.length > 0 && (
-        <div className="px-4 pb-3 pt-1">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <span className="text-sm">📖</span>
-            <span className="text-xs font-black text-[#0F172A]">السيرة</span>
-            <span className="px-1.5 rounded-full bg-[#5438DC]/15 text-[#5438DC] text-[9px] font-black">
-              {member.bio_json.length}
-            </span>
-          </div>
-          <div className="space-y-1">
-            {member.bio_json.slice(0, 3).map((station, i) => (
-              <div key={i} className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0]">
-                {station.year && (
-                  <span className="px-1.5 py-0 rounded bg-[#5438DC] text-white text-[10px] font-black flex-shrink-0">
-                    {station.year}
-                  </span>
-                )}
-                <div className="flex-1 min-w-0">
-                  {station.title && (
-                    <div className="text-xs font-black text-[#0F172A] truncate">{station.title}</div>
-                  )}
-                  {station.details && (
-                    <div className="text-[11px] text-[#64748B] line-clamp-1">{station.details}</div>
-                  )}
-                </div>
-              </div>
-            ))}
-            {member.bio_json.length > 3 && canModerate && (
-              <Link
-                href={`/admin/profiles/${member.id}`}
-                className="block text-center text-xs font-bold text-[#357DED] hover:underline pt-1"
-              >
-                + {member.bio_json.length - 3} محطات أخرى — عرض الملف
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
-}
-
-// ═══════════ Data Field (label + value) ═══════════
-function DataField({
-  label,
-  icon,
-  value,
-  color,
-  href,
-  dir,
-  muted,
-}: {
-  label: string;
-  icon: string;
-  value: string;
-  color: string;
-  href?: string;
-  dir?: string;
-  muted?: boolean;
-}) {
-  const inner = (
-    <div
-      className={`rounded-lg p-2 transition ${
-        href ? "hover:scale-[1.02] cursor-pointer" : ""
-      }`}
-      style={{
-        background: muted ? "#F8FAFC" : `${color}10`,
-        border: `1px solid ${muted ? "#E2E8F0" : `${color}25`}`,
-      }}
-    >
-      <div className="flex items-center gap-1 text-[10px] font-bold mb-0.5" style={{ color: muted ? "#94A3B8" : color }}>
-        <span className="text-xs">{icon}</span>
-        <span>{label}</span>
-      </div>
-      <div
-        className={`text-sm font-black truncate ${muted ? "text-[#94A3B8]" : "text-[#0F172A]"}`}
-        dir={dir}
-      >
-        {value}
-      </div>
-    </div>
-  );
-
-  return href ? <a href={href}>{inner}</a> : inner;
 }
 
 // ═══════════ Pill ═══════════
@@ -692,20 +574,6 @@ function roleColorOf(role: string): string {
     default:
       return "#6B7B8D";
   }
-}
-
-function genderIcon(g: string): string {
-  const v = g.toLowerCase();
-  if (v === "male" || v === "ذكر" || v === "m") return "♂️";
-  if (v === "female" || v === "أنثى" || v === "f") return "♀️";
-  return "👤";
-}
-
-function genderLabel(g: string): string {
-  const v = g.toLowerCase();
-  if (v === "male" || v === "m") return "ذكر";
-  if (v === "female" || v === "f") return "أنثى";
-  return g;
 }
 
 function formatDate(iso: string): string {
