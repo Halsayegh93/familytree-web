@@ -539,14 +539,14 @@ function NodeCard({
   return (
     <button
       onClick={onClick}
-      className={`group relative bg-white rounded-lg border border-[#E2E8F0] hover:border-[#10B981] hover:shadow-sm transition w-full text-right overflow-hidden ${
-        compact ? "p-1.5" : "p-2"
+      className={`group relative bg-white rounded-xl border border-[#E2E8F0] hover:border-[#10B981] hover:shadow-md hover:-translate-y-0.5 transition w-full text-right overflow-hidden ${
+        compact ? "p-2" : "p-2.5"
       }`}
     >
       <div className="flex items-center gap-2">
         <div
-          className={`rounded-lg flex items-center justify-center text-white font-black overflow-hidden flex-shrink-0 transition-transform group-hover:scale-110 ${
-            compact ? "w-8 h-8 text-xs" : "w-9 h-9 text-sm"
+          className={`rounded-xl flex items-center justify-center text-white font-black overflow-hidden flex-shrink-0 transition-transform group-hover:scale-110 ${
+            compact ? "w-10 h-10 text-base" : "w-11 h-11 text-base"
           } ${dimmed ? "grayscale opacity-70" : ""}`}
           style={{
             background: `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)`,
@@ -561,19 +561,19 @@ function NodeCard({
         </div>
         <div className="flex-1 min-w-0">
           <div
-            className={`font-black truncate ${compact ? "text-[11px]" : "text-xs"} ${
+            className={`font-black truncate ${compact ? "text-xs" : "text-sm"} ${
               dimmed ? "text-[#94A3B8]" : "text-[#0F172A]"
             }`}
           >
             {member.first_name}
           </div>
-          <div className="flex items-center gap-0.5 flex-wrap">
+          <div className="flex items-center gap-0.5 flex-wrap mt-0.5">
             {member.is_deceased && (
-              <span className="text-[9px] text-[#6B7B8D]">🕊️</span>
+              <span className="text-[10px] text-[#6B7B8D]">🕊️</span>
             )}
             {childrenCount > 0 && (
               <span
-                className="px-1 py-0 rounded-full text-[9px] font-black"
+                className="px-1.5 py-0 rounded-full text-[10px] font-black"
                 style={{ background: `${roleColor}18`, color: roleColor }}
               >
                 +{childrenCount}

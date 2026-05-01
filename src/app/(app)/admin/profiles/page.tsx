@@ -26,10 +26,43 @@ export default async function AdminProfilesPage() {
   // كل الأعضاء
   const { data: members } = await supabase
     .from("profiles")
-    .select("id, first_name, full_name, phone_number, role, status, avatar_url, is_deceased, birth_date, created_at")
+    .select("id, first_name, full_name, phone_number, role, status, avatar_url, is_deceased, birth_date, created_at, father_id")
     .neq("role", "pending")
     .order("full_name", { ascending: true })
     .limit(10000);
+
+  // ============ حصر الفروع ============
+  // حساب الفرع لكل عضو (الجيل ٣ من الجذر = الفرع الرئيسي)
+  const memberById = new Map<string, any>();
+  (members ?? []).forEach((m: any) => memberById.set(m.id, m));
+
+  function getBranch(memberId: string): { id: string; name: string } | null {
+    const lineage: any[] = [];
+    let cur: any = memberById.get(memberId);
+    let safety = 50;
+    while (cur && safety-- > 0) {
+      lineage.push(cur);
+      cur = cur.father_id ? memberById.get(cur.father_id) : null;
+    }
+    // lineage[length-1] = الجذر، lineage[length-2] = الجيل ٢، lineage[length-3] = الجيل ٣ (الفرع)
+    const branchNode =
+      lineage.length >= 3
+        ? lineage[lineage.length - 3]
+        : lineage.length >= 2
+        ? lineage[lineage.length - 2]
+        : lineage[lineage.length - 1];
+    if (!branchNode) return null;
+    return { id: branchNode.id, name: branchNode.full_name };
+  }
+
+  const membersWithBranch = (members ?? []).map((m: any) => {
+    const branch = getBranch(m.id);
+    return {
+      ...m,
+      branch_id: branch?.id ?? null,
+      branch_name: branch?.name ?? null,
+    };
+  });
 
   // جلب حالة النشاط للأعضاء (last_sign_in_at من auth)
   let activityMap: Record<string, { is_active: boolean; days_since_active: number | null; last_sign_in_at: string | null }> = {};
@@ -49,7 +82,7 @@ export default async function AdminProfilesPage() {
     }
   }
 
-  const membersWithActivity = (members ?? []).map((m: any) => ({
+  const membersWithActivity = membersWithBranch.map((m: any) => ({
     ...m,
     is_active: activityMap[m.id]?.is_active ?? false,
     days_since_active: activityMap[m.id]?.days_since_active ?? null,

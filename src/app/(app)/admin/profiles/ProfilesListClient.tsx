@@ -20,10 +20,12 @@ type Member = {
   is_active?: boolean;
   days_since_active?: number | null;
   last_sign_in_at?: string | null;
+  branch_id?: string | null;
+  branch_name?: string | null;
 };
 
 type StatusFilter = "all" | "living" | "deceased" | "frozen" | "inactive";
-type SortMode = "name" | "recent" | "role" | "activity";
+type SortMode = "name" | "recent" | "role" | "activity" | "branch";
 
 // ─── Toast ───────────────────────────────────────────────────────────────────
 function useToast() {
@@ -167,42 +169,41 @@ function MemberFileCard({
       )}
 
       <Link href={`/admin/profiles/${member.id}`} className="block p-4">
-        {/* صف رأسي: أفاتار + اسم + حالة */}
-        <div className="flex items-start gap-3 mb-3">
-          <Avatar member={member} size={56} radius={16} />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start gap-2">
-              <h3
-                className={`flex-1 font-black text-sm leading-tight ${
-                  dimmed ? "text-[#94A3B8]" : "text-[#0F172A]"
-                }`}
-              >
-                {member.full_name}
-              </h3>
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-              <Badge color={accentColor}>{roleAr(member.role)}</Badge>
-              <span
-                className="inline-flex items-center gap-1 text-[10px] font-black"
-                style={{ color: status.color }}
-              >
-                <span>{status.emoji}</span>
-                <span>{status.label}</span>
-              </span>
-            </div>
+        {/* صورة وسط + اسم تحتها */}
+        <div className="flex flex-col items-center text-center mb-3">
+          <Avatar member={member} size={72} radius={20} />
+          <h3
+            className={`font-black text-sm leading-tight mt-2 line-clamp-2 ${
+              dimmed ? "text-[#94A3B8]" : "text-[#0F172A]"
+            }`}
+          >
+            {member.full_name}
+          </h3>
+          <div className="flex flex-wrap items-center justify-center gap-1.5 mt-1.5">
+            <Badge color={accentColor}>{roleAr(member.role)}</Badge>
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-black"
+              style={{ color: status.color }}
+            >
+              <span>{status.emoji}</span>
+              <span>{status.label}</span>
+            </span>
           </div>
+          {member.branch_name && (
+            <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-black bg-[#F1F5F9] text-[#5438DC]">
+              🌳 {member.branch_name}
+            </span>
+          )}
         </div>
 
         {/* بيانات سريعة */}
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 border-t border-[#F1F5F9] pt-2">
           {member.phone_number && (
             <InfoRow icon="📞" value={formatPhone(member.phone_number)} dir="ltr" />
           )}
           {member.birth_date && (
             <InfoRow icon="🎂" value={formatBirthDate(member.birth_date)} />
           )}
-          <InfoRow icon="📅" value={`سجل: ${formatJoinDate(member.created_at)}`} muted />
-          {/* آخر نشاط */}
           {member.last_sign_in_at ? (
             <InfoRow icon="🟢" value={`آخر دخول: ${formatJoinDate(member.last_sign_in_at)}`} muted />
           ) : !member.is_deceased && member.status !== "frozen" ? (
@@ -350,6 +351,7 @@ export function ProfilesListClient({
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [branchFilter, setBranchFilter] = useState<string>("all"); // "all" أو branch_id
   const [sortMode, setSortMode] = useState<SortMode>("name");
   const [displayLimit, setDisplayLimit] = useState(18);
   const [busy, setBusy] = useState<string | null>(null);
@@ -358,7 +360,22 @@ export function ProfilesListClient({
   const [confirmAction, setConfirmAction] = useState<"freeze" | "activate">("freeze");
 
   useEffect(() => { setMembers(initialMembers); }, [initialMembers]);
-  useEffect(() => { setDisplayLimit(18); }, [search, statusFilter, sortMode]);
+  useEffect(() => { setDisplayLimit(18); }, [search, statusFilter, branchFilter, sortMode]);
+
+  // قائمة الفروع المتاحة مع عدد الأعضاء
+  const branches = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; count: number }>();
+    members.forEach((m) => {
+      if (!m.branch_id || !m.branch_name) return;
+      const existing = map.get(m.branch_id);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        map.set(m.branch_id, { id: m.branch_id, name: m.branch_name, count: 1 });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [members]);
 
   const counts = useMemo(() => ({
     all:      members.length,
@@ -375,6 +392,11 @@ export function ProfilesListClient({
     if (statusFilter === "deceased") result = result.filter((m) => !!m.is_deceased);
     if (statusFilter === "frozen")   result = result.filter((m) => m.status === "frozen");
     if (statusFilter === "inactive") result = result.filter((m) => m.is_active !== true && !m.is_deceased && m.status !== "frozen");
+
+    // فلترة بالفرع
+    if (branchFilter !== "all") {
+      result = result.filter((m) => m.branch_id === branchFilter);
+    }
 
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -398,12 +420,21 @@ export function ProfilesListClient({
         const bDays = b.days_since_active ?? 9999;
         return bDays - aDays;
       });
+    } else if (sortMode === "branch") {
+      // ترتيب بالفرع
+      result.sort((a, b) => {
+        const ab = a.branch_name ?? "";
+        const bb = b.branch_name ?? "";
+        const cmp = ab.localeCompare(bb, "ar");
+        if (cmp !== 0) return cmp;
+        return a.full_name.localeCompare(b.full_name, "ar");
+      });
     } else {
       result.sort((a, b) => a.full_name.localeCompare(b.full_name, "ar"));
     }
 
     return result;
-  }, [members, search, statusFilter, sortMode]);
+  }, [members, search, statusFilter, branchFilter, sortMode]);
 
   const visible = filtered.slice(0, displayLimit);
   const hasMore = filtered.length > displayLimit;
@@ -452,6 +483,38 @@ export function ProfilesListClient({
         <StatCard icon="🕊️" value={counts.deceased} label="متوفون" color="#6B7B8D" />
         <StatCard icon="🔒" value={counts.frozen}   label="مجمّد" color="#EF4444" pulse={counts.frozen > 0} />
       </div>
+
+      {/* === حصر الفروع === */}
+      {branches.length > 0 && (
+        <div className="bg-white rounded-2xl border border-[#E2E8F0] p-3 space-y-2">
+          <div className="flex items-center gap-2 px-1">
+            <span className="text-base">🌳</span>
+            <h3 className="font-black text-sm text-[#0F172A]">حصر الفروع</h3>
+            <span className="px-2 py-0.5 rounded-full bg-[#5438DC]/15 text-[#5438DC] text-[10px] font-black">
+              {branches.length} فرع
+            </span>
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+            <BranchChip
+              active={branchFilter === "all"}
+              onClick={() => setBranchFilter("all")}
+              label="كل الفروع"
+              count={members.length}
+              color="#5438DC"
+            />
+            {branches.map((b) => (
+              <BranchChip
+                key={b.id}
+                active={branchFilter === b.id}
+                onClick={() => setBranchFilter(b.id)}
+                label={b.name}
+                count={b.count}
+                color={branchColorOf(b.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* === لوحة البحث والتحكم === */}
       <div className="bg-white rounded-2xl border border-[#E2E8F0] p-3 space-y-2.5">
@@ -521,6 +584,7 @@ export function ProfilesListClient({
             <option value="name">↓ بالاسم</option>
             <option value="recent">↓ الأحدث</option>
             <option value="role">↓ الدور</option>
+            <option value="branch">↓ بالفرع</option>
             <option value="activity">↓ غير النشط أولاً</option>
           </select>
         </div>
@@ -637,6 +701,46 @@ function StatCard({
   );
 }
 
+// ─── Branch Chip ──────────────────────────────────────────────────────────────
+function BranchChip({
+  active,
+  onClick,
+  label,
+  count,
+  color,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count: number;
+  color: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap border-2 ${
+        active ? "text-white shadow-sm" : "text-[#475569] bg-white hover:bg-[#F8FAFC]"
+      }`}
+      style={
+        active
+          ? { background: color, borderColor: color }
+          : { borderColor: `${color}40` }
+      }
+    >
+      <span>🌳</span>
+      <span>{label}</span>
+      <span
+        className={`px-1.5 rounded-full text-[10px] font-black ${
+          active ? "bg-white/30 text-white" : "text-white"
+        }`}
+        style={!active ? { background: color } : {}}
+      >
+        {count}
+      </span>
+    </button>
+  );
+}
+
 // ─── Filter Chip ──────────────────────────────────────────────────────────────
 function FilterChip({
   active, onClick, label, count, color,
@@ -694,6 +798,16 @@ function roleColorOf(role: string): string {
     case "supervisor": return "#F59E0B";
     default:           return "#357DED";
   }
+}
+
+// تخصيص لون لكل فرع بناءً على hash
+function branchColorOf(id: string): string {
+  const colors = ["#357DED", "#10B981", "#F59E0B", "#EC4899", "#06B6D4", "#5438DC", "#EF4444", "#84CC16", "#A855F7"];
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  }
+  return colors[Math.abs(hash) % colors.length];
 }
 
 function formatBirthDate(iso: string): string {
