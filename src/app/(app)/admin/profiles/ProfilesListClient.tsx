@@ -136,13 +136,13 @@ function MemberFileCard({
   onToggle: (m: Member) => void;
 }) {
   const accentColor = roleColorOf(member.role);
-  const isInactive = !member.is_deceased && member.status !== "frozen" && member.is_active === false;
+  const isInactive = !member.is_deceased && member.status !== "frozen" && member.is_active !== true;
   const status = member.is_deceased
     ? { label: "متوفى", color: "#6B7B8D", emoji: "🕊️" }
     : member.status === "frozen"
     ? { label: "مجمّد", color: "#EF4444", emoji: "🔒" }
     : isInactive
-    ? { label: "غير نشط", color: "#F59E0B", emoji: "💤" }
+    ? { label: "غير نشط", color: "#EF4444", emoji: "💤" }
     : { label: "نشط", color: "#10B981", emoji: "●" };
 
   const dimmed = member.is_deceased || member.status === "frozen";
@@ -160,7 +160,7 @@ function MemberFileCard({
       {/* شارة غير نشط */}
       {isInactive && (
         <div className="absolute top-3 left-3 z-10">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#FFFBEB] border border-[#FCD34D] text-[#B45309] text-[10px] font-black animate-pulse">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#FEF2F2] border border-[#FCA5A5] text-[#B91C1C] text-[10px] font-black animate-pulse">
             💤 غير نشط
           </span>
         </div>
@@ -254,7 +254,7 @@ function MemberFileRow({
   onToggle: (m: Member) => void;
 }) {
   const accentColor = roleColorOf(member.role);
-  const isInactive = !member.is_deceased && member.status !== "frozen" && member.is_active === false;
+  const isInactive = !member.is_deceased && member.status !== "frozen" && member.is_active !== true;
   const dimmed = member.is_deceased || member.status === "frozen";
 
   return (
@@ -279,7 +279,7 @@ function MemberFileRow({
             <Badge color={accentColor}>{roleAr(member.role)}</Badge>
             {member.is_deceased && <Badge color="#6B7B8D">🕊️</Badge>}
             {member.status === "frozen" && <Badge color="#EF4444">🔒 مجمّد</Badge>}
-            {isInactive && <Badge color="#F59E0B">💤 غير نشط</Badge>}
+            {isInactive && <Badge color="#EF4444">💤 غير نشط</Badge>}
           </div>
           <div className="flex items-center gap-3 mt-0.5">
             {member.phone_number && (
@@ -362,18 +362,19 @@ export function ProfilesListClient({
 
   const counts = useMemo(() => ({
     all:      members.length,
-    living:   members.filter((m) => !m.is_deceased && m.status !== "frozen").length,
+    // النشط = دخل التطبيق فعلياً
+    living:   members.filter((m) => m.is_active === true && !m.is_deceased && m.status !== "frozen").length,
     deceased: members.filter((m) => !!m.is_deceased).length,
     frozen:   members.filter((m) => m.status === "frozen").length,
-    inactive: members.filter((m) => !m.is_active && !m.is_deceased && m.status !== "frozen").length,
+    inactive: members.filter((m) => m.is_active !== true && !m.is_deceased && m.status !== "frozen").length,
   }), [members]);
 
   const filtered = useMemo(() => {
     let result = [...members];
-    if (statusFilter === "living")   result = result.filter((m) => !m.is_deceased && m.status !== "frozen");
+    if (statusFilter === "living")   result = result.filter((m) => m.is_active === true && !m.is_deceased && m.status !== "frozen");
     if (statusFilter === "deceased") result = result.filter((m) => !!m.is_deceased);
     if (statusFilter === "frozen")   result = result.filter((m) => m.status === "frozen");
-    if (statusFilter === "inactive") result = result.filter((m) => !m.is_active && !m.is_deceased && m.status !== "frozen");
+    if (statusFilter === "inactive") result = result.filter((m) => m.is_active !== true && !m.is_deceased && m.status !== "frozen");
 
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -447,7 +448,7 @@ export function ProfilesListClient({
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         <StatCard icon="📁" value={counts.all}      label="إجمالي" color="#357DED" />
         <StatCard icon="✅" value={counts.living}   label="حسابات نشطة" color="#10B981" />
-        <StatCard icon="💤" value={counts.inactive} label="غير نشط" color="#F59E0B" pulse={counts.inactive > 0} />
+        <StatCard icon="💤" value={counts.inactive} label="غير نشط" color="#EF4444" pulse={counts.inactive > 0} />
         <StatCard icon="🕊️" value={counts.deceased} label="متوفون" color="#6B7B8D" />
         <StatCard icon="🔒" value={counts.frozen}   label="مجمّد" color="#EF4444" pulse={counts.frozen > 0} />
       </div>
@@ -503,7 +504,7 @@ export function ProfilesListClient({
             <FilterChip active={statusFilter === "all"}      onClick={() => setStatusFilter("all")}      label="الكل"     count={counts.all}      color="#5438DC" />
             <FilterChip active={statusFilter === "living"}   onClick={() => setStatusFilter("living")}   label="نشط"      count={counts.living}   color="#10B981" />
             {counts.inactive > 0 && (
-              <FilterChip active={statusFilter === "inactive"} onClick={() => setStatusFilter("inactive")} label="💤 غير نشط" count={counts.inactive} color="#F59E0B" />
+              <FilterChip active={statusFilter === "inactive"} onClick={() => setStatusFilter("inactive")} label="💤 غير نشط" count={counts.inactive} color="#EF4444" />
             )}
             <FilterChip active={statusFilter === "deceased"} onClick={() => setStatusFilter("deceased")} label="🕊️ متوفى" count={counts.deceased} color="#6B7B8D" />
             {counts.frozen > 0 && (
