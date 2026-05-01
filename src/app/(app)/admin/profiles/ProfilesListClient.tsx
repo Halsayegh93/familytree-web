@@ -362,7 +362,7 @@ export function ProfilesListClient({
   useEffect(() => { setMembers(initialMembers); }, [initialMembers]);
   useEffect(() => { setDisplayLimit(18); }, [search, statusFilter, branchFilter, sortMode]);
 
-  // قائمة الفروع المتاحة مع عدد الأعضاء
+  // قائمة الفروع المتاحة مع عدد الأعضاء (تبقى ثابتة من كل الأعضاء)
   const branches = useMemo(() => {
     const map = new Map<string, { id: string; name: string; count: number }>();
     members.forEach((m) => {
@@ -377,14 +377,21 @@ export function ProfilesListClient({
     return Array.from(map.values()).sort((a, b) => b.count - a.count);
   }, [members]);
 
+  // الأعضاء بعد تطبيق فلتر الفرع — يُستخدم لحساب الإحصائيات + الفلترة
+  const branchScopedMembers = useMemo(() => {
+    if (branchFilter === "all") return members;
+    return members.filter((m) => m.branch_id === branchFilter);
+  }, [members, branchFilter]);
+
+  // الإحصائيات تتبع الفرع المختار
   const counts = useMemo(() => ({
-    all:      members.length,
+    all:      branchScopedMembers.length,
     // النشط = دخل التطبيق فعلياً
-    living:   members.filter((m) => m.is_active === true && !m.is_deceased && m.status !== "frozen").length,
-    deceased: members.filter((m) => !!m.is_deceased).length,
-    frozen:   members.filter((m) => m.status === "frozen").length,
-    inactive: members.filter((m) => m.is_active !== true && !m.is_deceased && m.status !== "frozen").length,
-  }), [members]);
+    living:   branchScopedMembers.filter((m) => m.is_active === true && !m.is_deceased && m.status !== "frozen").length,
+    deceased: branchScopedMembers.filter((m) => !!m.is_deceased).length,
+    frozen:   branchScopedMembers.filter((m) => m.status === "frozen").length,
+    inactive: branchScopedMembers.filter((m) => m.is_active !== true && !m.is_deceased && m.status !== "frozen").length,
+  }), [branchScopedMembers]);
 
   const filtered = useMemo(() => {
     let result = [...members];
