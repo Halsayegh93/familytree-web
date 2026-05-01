@@ -70,21 +70,22 @@ export default async function AdminProfilesPage() {
 
   // جلب حالة النشاط للأعضاء (last_sign_in_at من auth)
   let activityMap: Record<string, { is_active: boolean; days_since_active: number | null; last_sign_in_at: string | null }> = {};
+  let debugInfo = "";
   if (members && members.length > 0) {
     const { data: activity, error: activityErr } = await supabase.rpc("get_members_activity", {
       member_ids: members.map((m: any) => m.id),
     });
 
     if (activityErr) {
-      console.error("[get_members_activity] RPC error:", activityErr);
+      debugInfo = `RPC ERROR: ${activityErr.message} | code: ${activityErr.code} | hint: ${activityErr.hint ?? "—"}`;
+    } else if (!Array.isArray(activity)) {
+      debugInfo = `RPC returned non-array: ${typeof activity}`;
     } else {
-      console.log(
-        "[get_members_activity] success:",
-        Array.isArray(activity) ? activity.length : 0,
-        "rows;",
-        Array.isArray(activity) ? activity.filter((r: any) => r.is_active).length : 0,
-        "active"
-      );
+      const activeCount = activity.filter((r: any) => r.is_active).length;
+      const sample = activity[0]
+        ? `sample[0]: is_active=${activity[0].is_active}, last_active_at=${activity[0].last_active_at}, last_sign_in=${activity[0].last_sign_in_at}, last_session=${activity[0].last_session_at}`
+        : "no rows";
+      debugInfo = `RPC OK: ${activity.length} rows, ${activeCount} active. ${sample}`;
     }
 
     if (activity) {
@@ -180,6 +181,13 @@ export default async function AdminProfilesPage() {
           subtitle={`${members?.length ?? 0} عضو في النظام`}
           badge={isHR ? { label: "🔒 لجنة", private: true } : undefined}
         />
+
+        {/* Debug — مؤقت */}
+        {debugInfo && (
+          <div className="bg-yellow-50 border border-yellow-300 rounded-xl p-3 text-xs font-mono text-yellow-900 break-all">
+            🐛 {debugInfo}
+          </div>
+        )}
 
         <MembersTabs
           showFollowUp={isHR}
