@@ -125,123 +125,6 @@ function Avatar({ member, size = 40, radius = 12 }: { member: Member; size?: num
   );
 }
 
-// ─── Member File Card (dossier-style) ─────────────────────────────────────────
-function MemberFileCard({
-  member,
-  canEdit,
-  busy,
-  onToggle,
-}: {
-  member: Member;
-  canEdit: boolean;
-  busy: boolean;
-  onToggle: (m: Member) => void;
-}) {
-  const accentColor = roleColorOf(member.role);
-  const isInactive = !member.is_deceased && member.status !== "frozen" && member.is_active !== true;
-  const status = member.is_deceased
-    ? { label: "متوفى", color: "#6B7B8D", emoji: "🕊️" }
-    : member.status === "frozen"
-    ? { label: "مجمّد", color: "#EF4444", emoji: "🔒" }
-    : isInactive
-    ? { label: "غير نشط", color: "#EF4444", emoji: "💤" }
-    : { label: "نشط", color: "#10B981", emoji: "●" };
-
-  const dimmed = member.is_deceased || member.status === "frozen";
-
-  return (
-    <div
-      className={`bg-white rounded-2xl border overflow-hidden transition hover:shadow-md hover:-translate-y-0.5 group relative ${
-        dimmed ? "border-[#E2E8F0]" : "border-[#E2E8F0] hover:border-transparent"
-      }`}
-      style={!dimmed ? { } : {}}
-    >
-      {/* شريط علوي بلون الدور */}
-      <div className="h-1.5" style={{ background: accentColor }} />
-
-      {/* شارة غير نشط */}
-      {isInactive && (
-        <div className="absolute top-3 left-3 z-10">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#FEF2F2] border border-[#FCA5A5] text-[#B91C1C] text-[10px] font-black animate-pulse">
-            💤 غير نشط
-          </span>
-        </div>
-      )}
-
-      <Link href={`/admin/profiles/${member.id}`} className="block p-4">
-        {/* صورة وسط + اسم تحتها */}
-        <div className="flex flex-col items-center text-center mb-3">
-          <Avatar member={member} size={72} radius={20} />
-          <h3
-            className={`font-black text-sm leading-tight mt-2 line-clamp-2 ${
-              dimmed ? "text-[#94A3B8]" : "text-[#0F172A]"
-            }`}
-          >
-            {member.full_name}
-          </h3>
-          <div className="flex flex-wrap items-center justify-center gap-1.5 mt-1.5">
-            <Badge color={accentColor}>{roleAr(member.role)}</Badge>
-            <span
-              className="inline-flex items-center gap-1 text-[10px] font-black"
-              style={{ color: status.color }}
-            >
-              <span>{status.emoji}</span>
-              <span>{status.label}</span>
-            </span>
-          </div>
-          {member.branch_name && (
-            <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-black bg-[#F1F5F9] text-[#5438DC]">
-              🌳 {member.branch_name}
-            </span>
-          )}
-        </div>
-
-        {/* بيانات سريعة */}
-        <div className="space-y-1.5 border-t border-[#F1F5F9] pt-2">
-          {member.phone_number && (
-            <InfoRow icon="📞" value={formatPhone(member.phone_number)} dir="ltr" />
-          )}
-          {member.birth_date && (
-            <InfoRow icon="🎂" value={formatBirthDate(member.birth_date)} />
-          )}
-          {member.last_sign_in_at ? (
-            <InfoRow icon="🟢" value={`آخر دخول: ${formatJoinDate(member.last_sign_in_at)}`} muted />
-          ) : !member.is_deceased && member.status !== "frozen" ? (
-            <InfoRow icon="❌" value="لم يدخل التطبيق أبداً" muted />
-          ) : null}
-        </div>
-      </Link>
-
-      {/* أزرار الإجراءات */}
-      {canEdit && !member.is_deceased && (
-        <div className="px-4 pb-3 pt-1 border-t border-[#F1F5F9] flex gap-2">
-          <Link
-            href={`/admin/profiles/${member.id}`}
-            className="flex-1 h-8 rounded-lg bg-[#F1F5F9] text-[#475569] text-xs font-bold flex items-center justify-center gap-1 hover:bg-[#357DED] hover:text-white transition"
-          >
-            <span>📂</span>
-            <span>فتح الملف</span>
-          </Link>
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              onToggle(member);
-            }}
-            disabled={busy}
-            className={`h-8 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-40 transition ${
-              member.status === "frozen"
-                ? "bg-[#10B981] text-white hover:opacity-90"
-                : "bg-[#FEF2F2] text-[#EF4444] hover:bg-[#FEE2E2]"
-            }`}
-          >
-            {busy ? "..." : member.status === "frozen" ? "🔓" : "🔒"}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Member File Row (compact list) ───────────────────────────────────────────
 function MemberFileRow({
   member,
@@ -325,15 +208,6 @@ function MemberFileRow({
   );
 }
 
-function InfoRow({ icon, value, dir, muted }: { icon: string; value: string; dir?: string; muted?: boolean }) {
-  return (
-    <div className={`flex items-center gap-1.5 text-xs ${muted ? "text-[#94A3B8]" : "text-[#64748B]"}`}>
-      <span className="text-[10px]">{icon}</span>
-      <span className="font-semibold truncate" dir={dir}>{value}</span>
-    </div>
-  );
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function ProfilesListClient({
   members: initialMembers,
@@ -349,7 +223,6 @@ export function ProfilesListClient({
 
   const [members, setMembers] = useState(initialMembers);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<"grid" | "list">("grid");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [branchFilter, setBranchFilter] = useState<string>("all"); // "all" أو branch_id
   const [sortMode, setSortMode] = useState<SortMode>("name");
@@ -480,18 +353,9 @@ export function ProfilesListClient({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
 
-      {/* === الإحصائيات === */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-        <StatCard icon="📁" value={counts.all}      label="إجمالي" color="#357DED" />
-        <StatCard icon="✅" value={counts.living}   label="حسابات نشطة" color="#10B981" />
-        <StatCard icon="💤" value={counts.inactive} label="غير نشط" color="#EF4444" pulse={counts.inactive > 0} />
-        <StatCard icon="🕊️" value={counts.deceased} label="متوفون" color="#6B7B8D" />
-        <StatCard icon="🔒" value={counts.frozen}   label="مجمّد" color="#EF4444" pulse={counts.frozen > 0} />
-      </div>
-
-      {/* === حصر الفروع (قائمة منسدلة) === */}
+      {/* === الفروع (قائمة منسدلة) === */}
       {branches.length > 0 && (
         <BranchPicker
           branches={branches}
@@ -501,113 +365,63 @@ export function ProfilesListClient({
         />
       )}
 
-      {/* === لوحة البحث والتحكم === */}
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-3 space-y-2.5">
-        {/* بحث + عرض */}
-        <div className="flex gap-2">
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              placeholder="🔍 بحث في الملفات بالاسم أو الهاتف..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pr-4 pl-10 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#357DED] text-[#0F172A] text-sm font-semibold"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-[#E2E8F0] text-[#64748B] text-xs hover:bg-[#CBD5E1]"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-
-          {/* تبديل العرض */}
-          <div className="flex bg-[#F1F5F9] rounded-xl p-0.5">
+      {/* === توولبار موحّد: بحث + ترتيب === */}
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-2 flex gap-2">
+        <div className="flex-1 relative">
+          <input
+            type="text"
+            placeholder="🔍 ابحث بالاسم أو الهاتف..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full px-3 py-2 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#357DED] text-[#0F172A] text-sm font-semibold"
+          />
+          {search && (
             <button
-              onClick={() => setView("grid")}
-              className={`px-3 py-2 rounded-lg text-sm font-bold transition ${
-                view === "grid" ? "bg-white text-[#357DED] shadow-sm" : "text-[#64748B]"
-              }`}
-              title="ملفات (شبكة)"
+              onClick={() => setSearch("")}
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-[#E2E8F0] text-[#64748B] text-xs hover:bg-[#CBD5E1]"
             >
-              🗂️
+              ✕
             </button>
-            <button
-              onClick={() => setView("list")}
-              className={`px-3 py-2 rounded-lg text-sm font-bold transition ${
-                view === "list" ? "bg-white text-[#357DED] shadow-sm" : "text-[#64748B]"
-              }`}
-              title="قائمة"
-            >
-              ☰
-            </button>
-          </div>
+          )}
         </div>
 
-        {/* الفلاتر + الترتيب */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-1.5 overflow-x-auto pb-0.5 flex-1">
-            <FilterChip active={statusFilter === "all"}      onClick={() => setStatusFilter("all")}      label="الكل"     count={counts.all}      color="#5438DC" />
-            <FilterChip active={statusFilter === "living"}   onClick={() => setStatusFilter("living")}   label="نشط"      count={counts.living}   color="#10B981" />
-            {counts.inactive > 0 && (
-              <FilterChip active={statusFilter === "inactive"} onClick={() => setStatusFilter("inactive")} label="💤 غير نشط" count={counts.inactive} color="#EF4444" />
-            )}
-            <FilterChip active={statusFilter === "deceased"} onClick={() => setStatusFilter("deceased")} label="🕊️ متوفى" count={counts.deceased} color="#6B7B8D" />
-            {counts.frozen > 0 && (
-              <FilterChip active={statusFilter === "frozen"} onClick={() => setStatusFilter("frozen")} label="🔒 مجمّد" count={counts.frozen} color="#EF4444" />
-            )}
-          </div>
-
-          {/* ترتيب */}
-          <select
-            value={sortMode}
-            onChange={(e) => setSortMode(e.target.value as SortMode)}
-            className="px-3 py-1.5 rounded-full bg-[#F1F5F9] text-xs font-bold text-[#475569] outline-none focus:ring-2 focus:ring-[#357DED] cursor-pointer"
-          >
-            <option value="name">↓ بالاسم</option>
-            <option value="recent">↓ الأحدث</option>
-            <option value="role">↓ الدور</option>
-            <option value="branch">↓ بالفرع</option>
-            <option value="activity">↓ غير النشط أولاً</option>
-          </select>
-        </div>
+        <select
+          value={sortMode}
+          onChange={(e) => setSortMode(e.target.value as SortMode)}
+          className="px-2 rounded-xl bg-[#F1F5F9] text-xs font-bold text-[#475569] outline-none focus:ring-2 focus:ring-[#357DED] cursor-pointer"
+        >
+          <option value="name">↓ بالاسم</option>
+          <option value="recent">↓ الأحدث</option>
+          <option value="branch">↓ بالفرع</option>
+          <option value="activity">↓ نشاط</option>
+        </select>
       </div>
 
-      {/* === عداد النتائج === */}
-      {(search || statusFilter !== "all") && (
-        <div className="text-xs text-[#64748B] px-1 font-bold">
-          📊 {filtered.length} ملف
-        </div>
-      )}
+      {/* === فلاتر مدمجة (تعمل كإحصائيات) === */}
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5 px-0.5">
+        <FilterChip active={statusFilter === "all"}      onClick={() => setStatusFilter("all")}      label="الكل"     count={counts.all}      color="#5438DC" />
+        <FilterChip active={statusFilter === "living"}   onClick={() => setStatusFilter("living")}   label="نشط"      count={counts.living}   color="#10B981" />
+        {counts.inactive > 0 && (
+          <FilterChip active={statusFilter === "inactive"} onClick={() => setStatusFilter("inactive")} label="💤 غير نشط" count={counts.inactive} color="#EF4444" />
+        )}
+        {counts.deceased > 0 && (
+          <FilterChip active={statusFilter === "deceased"} onClick={() => setStatusFilter("deceased")} label="🕊️ متوفى" count={counts.deceased} color="#6B7B8D" />
+        )}
+        {counts.frozen > 0 && (
+          <FilterChip active={statusFilter === "frozen"} onClick={() => setStatusFilter("frozen")} label="🔒 مجمّد" count={counts.frozen} color="#EF4444" />
+        )}
+      </div>
 
       {/* === الفراغ === */}
       {filtered.length === 0 && (
-        <div className="bg-white rounded-2xl border border-[#E2E8F0] p-14 text-center">
-          <div className="text-5xl mb-3">📂</div>
-          <p className="text-[#0F172A] font-bold mb-1">لا توجد ملفات مطابقة</p>
-          <p className="text-[#64748B] text-sm">جرّب تعديل البحث أو الفلتر</p>
+        <div className="bg-white rounded-2xl border border-[#E2E8F0] p-10 text-center">
+          <div className="text-4xl mb-2">📂</div>
+          <p className="text-[#0F172A] font-bold text-sm">لا توجد نتائج</p>
         </div>
       )}
 
-      {/* === عرض الشبكة (ملفات) === */}
-      {filtered.length > 0 && view === "grid" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {visible.map((m) => (
-            <MemberFileCard
-              key={m.id}
-              member={m}
-              canEdit={canEdit}
-              busy={busy === m.id}
-              onToggle={openConfirm}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* === عرض القائمة === */}
-      {filtered.length > 0 && view === "list" && (
+      {/* === القائمة الموحّدة === */}
+      {filtered.length > 0 && (
         <div className="bg-white rounded-2xl border border-[#E2E8F0] divide-y divide-[#F1F5F9] overflow-hidden">
           {visible.map((m) => (
             <MemberFileRow
@@ -625,10 +439,10 @@ export function ProfilesListClient({
       {hasMore && (
         <div className="text-center pt-1">
           <button
-            onClick={() => setDisplayLimit((l) => l + 18)}
-            className="px-6 py-2.5 rounded-full bg-white border-2 border-[#357DED] text-[#357DED] text-sm font-black hover:bg-[#EBF3FE] transition"
+            onClick={() => setDisplayLimit((l) => l + 30)}
+            className="px-5 py-2 rounded-full bg-white border border-[#E2E8F0] text-[#357DED] text-xs font-black hover:bg-[#EBF3FE] transition"
           >
-            تحميل المزيد ({filtered.length - displayLimit} متبقي) ▾
+            عرض المزيد ({filtered.length - displayLimit}) ▾
           </button>
         </div>
       )}
@@ -657,31 +471,6 @@ export function ProfilesListClient({
           {toast.msg}
         </div>
       )}
-    </div>
-  );
-}
-
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-function StatCard({
-  icon, value, label, color, pulse = false,
-}: {
-  icon: string; value: number; label: string; color: string; pulse?: boolean;
-}) {
-  return (
-    <div className="bg-white rounded-2xl border border-[#E2E8F0] p-3 flex items-center gap-2.5 relative hover:shadow-sm transition hover:-translate-y-0.5 overflow-hidden">
-      {pulse && value > 0 && (
-        <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-[#EF4444] animate-pulse" />
-      )}
-      <div
-        className="w-11 h-11 rounded-xl flex items-center justify-center text-lg flex-shrink-0 shadow-sm"
-        style={{ background: `${color}15`, color }}
-      >
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-xl font-black text-[#0F172A] leading-tight">{value}</div>
-        <div className="text-[11px] text-[#64748B] truncate font-semibold">{label}</div>
-      </div>
     </div>
   );
 }
@@ -908,12 +697,6 @@ function branchColorOf(id: string): string {
     hash = (hash * 31 + id.charCodeAt(i)) | 0;
   }
   return colors[Math.abs(hash) % colors.length];
-}
-
-function formatBirthDate(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
-  return new Intl.DateTimeFormat("ar", { day: "numeric", month: "long", year: "numeric" }).format(d);
 }
 
 function formatJoinDate(iso: string): string {

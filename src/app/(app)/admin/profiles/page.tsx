@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getProfileId } from "@/lib/get-profile-id";
-import { PageHero, PageBackground } from "@/components/PageHero";
+import { PageBackground } from "@/components/PageHero";
 import { redirect } from "next/navigation";
 import { ProfilesListClient } from "./ProfilesListClient";
 import { FollowUpDashboard } from "./FollowUpDashboard";
@@ -157,13 +157,22 @@ export default async function AdminProfilesPage() {
 
   return (
     <PageBackground theme="admin">
-      <main className="max-w-6xl mx-auto p-6 space-y-3">
-        <PageHero
-          theme="admin"
-          title="الأعضاء"
-          subtitle={`${members?.length ?? 0} عضو في النظام`}
-          badge={isHR ? { label: "🔒 لجنة", private: true } : undefined}
-        />
+      <main className="max-w-6xl mx-auto px-3 md:px-4 py-3 space-y-2">
+        {/* Hero مدمج صغير */}
+        <div className="flex items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">👥</span>
+            <div>
+              <h1 className="text-lg font-black text-[#0F172A] leading-tight">الأعضاء</h1>
+              <p className="text-xs text-[#64748B]">{members?.length ?? 0} عضو</p>
+            </div>
+          </div>
+          {isHR && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-[#5438DC]/15 text-[#5438DC]">
+              🔒 لجنة
+            </span>
+          )}
+        </div>
 
         <MembersTabs
           showFollowUp={isHR}
