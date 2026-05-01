@@ -239,30 +239,10 @@ export function TreeBrowser({
             father={focused.father_id ? byId.get(focused.father_id) ?? null : null}
             canModerate={canModerate}
             onFatherClick={() => focused.father_id && focus(focused.father_id)}
+            siblings={siblings}
+            siblingChildrenCount={(id) => childrenByFather.get(id)?.length ?? 0}
+            onSiblingClick={focus}
           />
-
-          {/* ═══════ الأشقاء ═══════ */}
-          {siblings.length > 0 && (
-            <Section
-              title="الإخوة"
-              count={siblings.length}
-              icon="👥"
-              color="#F59E0B"
-              compact
-            >
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1">
-                {siblings.map((s) => (
-                  <NodeCard
-                    key={s.id}
-                    member={s}
-                    onClick={() => focus(s.id)}
-                    childrenCount={childrenByFather.get(s.id)?.length ?? 0}
-                    compact
-                  />
-                ))}
-              </div>
-            </Section>
-          )}
 
           {/* ═══════ الأبناء ═══════ */}
           {directChildren.length > 0 ? (
@@ -306,6 +286,9 @@ function FocusedMemberCard({
   father,
   canModerate,
   onFatherClick,
+  siblings,
+  siblingChildrenCount,
+  onSiblingClick,
 }: {
   member: Member;
   generation: number;
@@ -314,7 +297,11 @@ function FocusedMemberCard({
   father: Member | null;
   canModerate: boolean;
   onFatherClick: () => void;
+  siblings: Member[];
+  siblingChildrenCount: (id: string) => number;
+  onSiblingClick: (id: string) => void;
 }) {
+  const [siblingsOpen, setSiblingsOpen] = useState(false);
   const roleColor = roleColorOf(member.role);
   void generation; // مخفي بناءً على طلب المستخدم
   void childrenCount;
@@ -324,6 +311,76 @@ function FocusedMemberCard({
       className="relative bg-white rounded-2xl border-2 shadow-md overflow-hidden"
       style={{ borderColor: `${roleColor}40` }}
     >
+      {/* شريط علوي: ملف+تعديل (يسار) — الإخوة (يمين) */}
+      {(canModerate || siblings.length > 0) && (
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+          {/* يسار: أزرار للمدراء */}
+          {canModerate ? (
+            <div className="flex items-center gap-1.5">
+              <Link
+                href={`/admin/profiles/${member.id}`}
+                className="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] text-[#475569] flex items-center justify-center text-base hover:bg-[#357DED] hover:text-white hover:border-[#357DED] transition"
+                title="فتح الملف الكامل"
+              >
+                📂
+              </Link>
+              <MemberFullEditClient
+                key={member.id}
+                member={member}
+                canManageRoles={canModerate}
+                variant="icon"
+              />
+            </div>
+          ) : (
+            <span />
+          )}
+
+          {/* يمين: زر الإخوة */}
+          {siblings.length > 0 && (
+            <button
+              onClick={() => setSiblingsOpen(!siblingsOpen)}
+              className={`inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-xs font-black transition ${
+                siblingsOpen
+                  ? "bg-[#F59E0B] text-white"
+                  : "bg-white border border-[#FCD34D] text-[#B45309] hover:bg-[#FFFBEB]"
+              }`}
+              title="عرض الإخوة"
+            >
+              <span>👥</span>
+              <span>الإخوة</span>
+              <span
+                className={`px-1.5 rounded-full text-[10px] font-black ${
+                  siblingsOpen ? "bg-white/30" : "bg-[#F59E0B] text-white"
+                }`}
+              >
+                {siblings.length}
+              </span>
+              <span className={`transition-transform ${siblingsOpen ? "rotate-180" : ""}`}>▾</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* قائمة الإخوة المنسدلة */}
+      {siblingsOpen && siblings.length > 0 && (
+        <div className="px-3 py-2.5 bg-[#FFFBEB] border-b border-[#FDE68A]">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1">
+            {siblings.map((s) => (
+              <NodeCard
+                key={s.id}
+                member={s}
+                onClick={() => {
+                  onSiblingClick(s.id);
+                  setSiblingsOpen(false);
+                }}
+                childrenCount={siblingChildrenCount(s.id)}
+                compact
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* رأس البطاقة */}
       <div
         className="px-4 py-4 flex items-center gap-4"
@@ -391,24 +448,6 @@ function FocusedMemberCard({
         </div>
       </div>
 
-      {/* شريط الإجراءات السفلي (للمدراء) */}
-      {canModerate && (
-        <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-[#E2E8F0]">
-          <Link
-            href={`/admin/profiles/${member.id}`}
-            className="w-9 h-9 rounded-xl bg-[#F1F5F9] text-[#475569] flex items-center justify-center text-base hover:bg-[#357DED] hover:text-white transition"
-            title="فتح الملف الكامل"
-          >
-            📂
-          </Link>
-          <MemberFullEditClient
-            key={member.id}
-            member={member}
-            canManageRoles={canModerate}
-            variant="icon"
-          />
-        </div>
-      )}
     </div>
   );
 }
