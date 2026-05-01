@@ -158,17 +158,10 @@ export default async function AdminProfilesPage() {
   return (
     <PageBackground theme="admin">
       <main className="max-w-6xl mx-auto px-3 md:px-4 py-3 space-y-2">
-        {/* Hero مدمج صغير */}
-        <div className="flex items-center justify-between gap-2 px-1">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">👥</span>
-            <h1 className="text-lg font-black text-[#0F172A] leading-tight">الأعضاء</h1>
-          </div>
-          {isHR && (
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-[#5438DC]/15 text-[#5438DC]">
-              🔒 لجنة
-            </span>
-          )}
+        {/* عنوان مدمج */}
+        <div className="flex items-center gap-2 px-1">
+          <span className="text-2xl">👥</span>
+          <h1 className="text-lg font-black text-[#0F172A] leading-tight">الأعضاء</h1>
         </div>
 
         <MembersTabs

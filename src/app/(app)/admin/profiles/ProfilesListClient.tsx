@@ -167,85 +167,87 @@ function MemberMiniCard({ member }: { member: Member }) {
   );
 }
 
-// ─── Member File Row (compact list) ───────────────────────────────────────────
+// ─── Member File Row (compact list — table style) ────────────────────────────
 function MemberFileRow({
   member,
   canEdit,
   busy,
   onToggle,
+  index,
 }: {
   member: Member;
   canEdit: boolean;
   busy: boolean;
   onToggle: (m: Member) => void;
+  index: number;
 }) {
-  const accentColor = roleColorOf(member.role);
   const isInactive = !member.is_deceased && member.status !== "frozen" && member.is_active !== true;
   const dimmed = member.is_deceased || member.status === "frozen";
 
+  // الحالة المختصرة
+  const statusLabel = member.is_deceased
+    ? { text: "🕊️ متوفى", color: "#6B7B8D" }
+    : member.status === "frozen"
+    ? { text: "🔒 مجمّد", color: "#EF4444" }
+    : isInactive
+    ? { text: "خامل", color: "#EF4444" }
+    : { text: "🟢 نشط", color: "#10B981" };
+
   return (
-    <div className="flex items-center gap-3 px-3 py-2.5 hover:bg-[#F8FAFC] transition group relative">
-      {/* خط جانبي بلون الدور */}
-      <div className="absolute right-0 top-2 bottom-2 w-1 rounded-l" style={{ background: accentColor }} />
+    <div className="grid grid-cols-[2.5rem_2.5rem_1fr_auto] sm:grid-cols-[2.5rem_2.5rem_1fr_10rem_8rem_auto] gap-2 items-center px-3 py-2 hover:bg-[#F8FAFC] transition">
+      {/* رقم */}
+      <div className="text-[#94A3B8] text-xs font-bold text-center">{index + 1}</div>
 
+      {/* أفاتار */}
+      <Avatar member={member} size={36} radius={10} />
+
+      {/* اسم */}
       <Link
         href={`/admin/profiles/${member.id}`}
-        className="flex items-center gap-3 flex-1 min-w-0 mr-2"
+        className={`min-w-0 font-bold text-sm hover:text-[#357DED] hover:underline truncate ${
+          dimmed ? "text-[#94A3B8]" : "text-[#0F172A]"
+        }`}
       >
-        <Avatar member={member} size={42} radius={12} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span
-              className={`font-black text-sm truncate ${
-                dimmed ? "text-[#94A3B8]" : "text-[#0F172A]"
-              }`}
-            >
-              {member.full_name}
-            </span>
-            <Badge color={accentColor}>{roleAr(member.role)}</Badge>
-            {member.is_deceased && <Badge color="#6B7B8D">🕊️</Badge>}
-            {member.status === "frozen" && <Badge color="#EF4444">🔒 مجمّد</Badge>}
-            {isInactive && <Badge color="#EF4444">💤 غير نشط</Badge>}
-          </div>
-          <div className="flex items-center gap-3 mt-0.5">
-            {member.phone_number && (
-              <span className="text-xs text-[#64748B] font-semibold" dir="ltr">
-                📞 {formatPhone(member.phone_number)}
-              </span>
-            )}
-            <span className="text-[11px] text-[#94A3B8]">
-              {member.last_sign_in_at
-                ? `🟢 ${formatJoinDate(member.last_sign_in_at)}`
-                : !member.is_deceased && member.status !== "frozen"
-                ? "❌ لم يدخل"
-                : `📅 ${formatJoinDate(member.created_at)}`}
-            </span>
-          </div>
-        </div>
+        {member.full_name}
       </Link>
 
-      {canEdit && !member.is_deceased && (
-        <button
-          onClick={() => onToggle(member)}
-          disabled={busy}
-          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold flex-shrink-0 transition disabled:opacity-40 ${
-            member.status === "frozen"
-              ? "bg-[#10B981] text-white hover:opacity-80"
-              : "bg-[#F1F5F9] text-[#EF4444] hover:bg-[#FEF2F2]"
-          }`}
-          title={member.status === "frozen" ? "تفعيل" : "تجميد"}
+      {/* هاتف (مخفي على الموبايل) */}
+      <span className="hidden sm:block text-xs text-[#64748B] font-semibold truncate" dir="ltr">
+        {member.phone_number ? formatPhone(member.phone_number) : "—"}
+      </span>
+
+      {/* الحالة (مخفي على الموبايل) */}
+      <span
+        className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-black w-fit"
+        style={{ background: `${statusLabel.color}15`, color: statusLabel.color }}
+      >
+        {statusLabel.text}
+      </span>
+
+      {/* أزرار */}
+      <div className="flex items-center gap-1 justify-end">
+        {canEdit && !member.is_deceased && (
+          <button
+            onClick={() => onToggle(member)}
+            disabled={busy}
+            className={`h-8 w-8 rounded-lg text-sm flex items-center justify-center disabled:opacity-40 transition ${
+              member.status === "frozen"
+                ? "bg-[#10B981]/15 text-[#10B981] hover:bg-[#10B981] hover:text-white"
+                : "bg-[#F1F5F9] text-[#EF4444] hover:bg-[#FEE2E2]"
+            }`}
+            title={member.status === "frozen" ? "تفعيل" : "تجميد"}
+          >
+            {busy ? "…" : member.status === "frozen" ? "🔓" : "🔒"}
+          </button>
+        )}
+        <Link
+          href={`/admin/profiles/${member.id}`}
+          className="h-8 w-8 rounded-lg bg-[#F1F5F9] text-[#475569] flex items-center justify-center text-sm hover:bg-[#357DED] hover:text-white transition"
+          title="فتح الملف"
         >
-          {busy ? "..." : member.status === "frozen" ? "🔓 تفعيل" : "🔒 تجميد"}
-        </button>
-      )}
-
-      <Link
-        href={`/admin/profiles/${member.id}`}
-        className="h-8 w-8 rounded-lg bg-[#F1F5F9] text-[#475569] flex items-center justify-center text-sm font-bold hover:bg-[#357DED] hover:text-white transition flex-shrink-0"
-        title="فتح الملف"
-      >
-        📂
-      </Link>
+          ←
+        </Link>
+      </div>
     </div>
   );
 }
@@ -485,18 +487,30 @@ export function ProfilesListClient({
         </div>
       )}
 
-      {/* === عرض القائمة === */}
+      {/* === عرض القائمة (نمط جدول) === */}
       {filtered.length > 0 && view === "list" && (
-        <div className="bg-white rounded-2xl border border-[#E2E8F0] divide-y divide-[#F1F5F9] overflow-hidden">
-          {visible.map((m) => (
-            <MemberFileRow
-              key={m.id}
-              member={m}
-              canEdit={canEdit}
-              busy={busy === m.id}
-              onToggle={openConfirm}
-            />
-          ))}
+        <div className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden">
+          {/* رأس الجدول */}
+          <div className="hidden sm:grid grid-cols-[2.5rem_2.5rem_1fr_10rem_8rem_auto] gap-2 items-center px-3 py-2 bg-[#F8FAFC] border-b border-[#E2E8F0] text-[10px] font-black text-[#64748B] uppercase tracking-wide">
+            <span className="text-center">#</span>
+            <span></span>
+            <span>الاسم</span>
+            <span>الهاتف</span>
+            <span>الحالة</span>
+            <span></span>
+          </div>
+          <div className="divide-y divide-[#F1F5F9]">
+            {visible.map((m, i) => (
+              <MemberFileRow
+                key={m.id}
+                index={i}
+                member={m}
+                canEdit={canEdit}
+                busy={busy === m.id}
+                onToggle={openConfirm}
+              />
+            ))}
+          </div>
         </div>
       )}
 
