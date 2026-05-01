@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatPhone } from "@/lib/format-phone";
@@ -484,36 +484,14 @@ export function ProfilesListClient({
         <StatCard icon="🔒" value={counts.frozen}   label="مجمّد" color="#EF4444" pulse={counts.frozen > 0} />
       </div>
 
-      {/* === حصر الفروع === */}
+      {/* === حصر الفروع (قائمة منسدلة) === */}
       {branches.length > 0 && (
-        <div className="bg-white rounded-2xl border border-[#E2E8F0] p-3 space-y-2">
-          <div className="flex items-center gap-2 px-1">
-            <span className="text-base">🌳</span>
-            <h3 className="font-black text-sm text-[#0F172A]">حصر الفروع</h3>
-            <span className="px-2 py-0.5 rounded-full bg-[#5438DC]/15 text-[#5438DC] text-[10px] font-black">
-              {branches.length} فرع
-            </span>
-          </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-            <BranchChip
-              active={branchFilter === "all"}
-              onClick={() => setBranchFilter("all")}
-              label="كل الفروع"
-              count={members.length}
-              color="#5438DC"
-            />
-            {branches.map((b) => (
-              <BranchChip
-                key={b.id}
-                active={branchFilter === b.id}
-                onClick={() => setBranchFilter(b.id)}
-                label={b.name}
-                count={b.count}
-                color={branchColorOf(b.id)}
-              />
-            ))}
-          </div>
-        </div>
+        <BranchPicker
+          branches={branches}
+          totalCount={members.length}
+          selectedId={branchFilter}
+          onSelect={setBranchFilter}
+        />
       )}
 
       {/* === لوحة البحث والتحكم === */}
@@ -701,42 +679,157 @@ function StatCard({
   );
 }
 
-// ─── Branch Chip ──────────────────────────────────────────────────────────────
-function BranchChip({
-  active,
-  onClick,
+// ─── Branch Picker (قائمة منسدلة) ─────────────────────────────────────────────
+function BranchPicker({
+  branches,
+  totalCount,
+  selectedId,
+  onSelect,
+}: {
+  branches: { id: string; name: string; count: number }[];
+  totalCount: number;
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // إغلاق عند الضغط خارج
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    if (open) document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  const selected =
+    selectedId === "all"
+      ? { name: "كل الفروع", count: totalCount, color: "#5438DC" }
+      : (() => {
+          const b = branches.find((x) => x.id === selectedId);
+          return b
+            ? { name: b.name, count: b.count, color: branchColorOf(b.id) }
+            : { name: "كل الفروع", count: totalCount, color: "#5438DC" };
+        })();
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full bg-white rounded-2xl border-2 border-[#E2E8F0] hover:border-[#5438DC] transition p-3 flex items-center gap-3 text-right"
+      >
+        {/* أيقونة الفرع */}
+        <div
+          className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0 shadow-sm"
+          style={{ background: `${selected.color}15`, color: selected.color }}
+        >
+          🌳
+        </div>
+
+        {/* الاسم + العدد */}
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] font-bold text-[#94A3B8] mb-0.5">
+            🌳 حصر الفروع — {branches.length} فرع
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-black text-sm text-[#0F172A] truncate">
+              {selected.name}
+            </span>
+            <span
+              className="px-2 py-0.5 rounded-full text-[10px] font-black flex-shrink-0"
+              style={{ background: selected.color, color: "white" }}
+            >
+              {selected.count}
+            </span>
+          </div>
+        </div>
+
+        {/* السهم */}
+        <span
+          className={`text-[#94A3B8] text-base flex-shrink-0 transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        >
+          ▾
+        </span>
+      </button>
+
+      {/* القائمة المنسدلة */}
+      {open && (
+        <div className="absolute top-full mt-2 right-0 left-0 bg-white rounded-2xl border-2 border-[#E2E8F0] shadow-xl z-40 overflow-hidden max-h-96 overflow-y-auto">
+          <BranchOption
+            label="كل الفروع"
+            count={totalCount}
+            color="#5438DC"
+            active={selectedId === "all"}
+            onClick={() => {
+              onSelect("all");
+              setOpen(false);
+            }}
+          />
+          <div className="border-t border-[#F1F5F9]" />
+          {branches.map((b) => (
+            <BranchOption
+              key={b.id}
+              label={b.name}
+              count={b.count}
+              color={branchColorOf(b.id)}
+              active={selectedId === b.id}
+              onClick={() => {
+                onSelect(b.id);
+                setOpen(false);
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BranchOption({
   label,
   count,
   color,
+  active,
+  onClick,
 }: {
-  active: boolean;
-  onClick: () => void;
   label: string;
   count: number;
   color: string;
+  active: boolean;
+  onClick: () => void;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap border-2 ${
-        active ? "text-white shadow-sm" : "text-[#475569] bg-white hover:bg-[#F8FAFC]"
+      className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#F8FAFC] transition text-right ${
+        active ? "bg-[#F8FAFC]" : ""
       }`}
-      style={
-        active
-          ? { background: color, borderColor: color }
-          : { borderColor: `${color}40` }
-      }
     >
-      <span>🌳</span>
-      <span>{label}</span>
-      <span
-        className={`px-1.5 rounded-full text-[10px] font-black ${
-          active ? "bg-white/30 text-white" : "text-white"
-        }`}
-        style={!active ? { background: color } : {}}
+      <div
+        className="w-9 h-9 rounded-lg flex items-center justify-center text-base flex-shrink-0"
+        style={{ background: `${color}15`, color }}
       >
-        {count}
-      </span>
+        🌳
+      </div>
+      <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+        <span
+          className={`font-bold text-sm truncate ${
+            active ? "text-[#0F172A]" : "text-[#475569]"
+          }`}
+        >
+          {label}
+        </span>
+        <span
+          className="px-2 py-0.5 rounded-full text-[10px] font-black text-white flex-shrink-0"
+          style={{ background: color }}
+        >
+          {count}
+        </span>
+      </div>
+      {active && <span className="text-[#10B981] text-base">✓</span>}
     </button>
   );
 }
