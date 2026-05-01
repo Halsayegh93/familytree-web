@@ -72,10 +72,15 @@ export default async function AdminProfilesPage() {
     });
     if (activity) {
       activityMap = (activity as any[]).reduce((acc, row) => {
+        // الأقرب من sign_in أو session أو device — أيهما أحدث
+        const latest = [row.last_sign_in_at, row.last_session_at, row.last_device_active]
+          .filter(Boolean)
+          .sort()
+          .reverse()[0] ?? null;
         acc[row.member_id] = {
           is_active: row.is_active,
           days_since_active: row.days_since_active,
-          last_sign_in_at: row.last_sign_in_at,
+          last_sign_in_at: latest,
         };
         return acc;
       }, {} as typeof activityMap);
