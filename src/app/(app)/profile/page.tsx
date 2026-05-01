@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getProfileId } from "@/lib/get-profile-id";
-import { PageBackground, PageHero } from "@/components/PageHero";
+import { PageBackground } from "@/components/PageHero";
 import { formatPhone } from "@/lib/format-phone";
 import { EditMyProfileButton } from "./EditMyProfileButton";
 import { AvatarUpload } from "./AvatarUpload";
@@ -32,29 +32,11 @@ export default async function ProfilePage() {
     father = data;
   }
 
-  let siblings: any[] = [];
-  if (profile?.father_id) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, full_name, role, avatar_url, is_deceased")
-      .eq("father_id", profile.father_id)
-      .neq("id", profileId!)
-      .order("sort_order", { ascending: true });
-    siblings = data ?? [];
-  }
-
   return (
     <PageBackground theme="profile">
-      <main className="max-w-3xl mx-auto p-6 space-y-3">
+      <main className="max-w-3xl mx-auto p-3 md:p-4 space-y-2">
 
-        {/* Hero */}
-        <PageHero
-          theme="profile"
-          title={profile?.full_name ?? "حسابي"}
-          subtitle={profile?.phone_number ? formatPhone(profile.phone_number) : undefined}
-        />
-
-        {/* Profile header card */}
+        {/* بطاقة موحّدة: الصورة + الاسم + الشارات + الهاتف + التعديل */}
         <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4">
           <div className="flex items-center gap-3">
             <AvatarUpload
@@ -63,84 +45,65 @@ export default async function ProfilePage() {
               fallback={initials(profile?.full_name ?? "؟")}
             />
             <div className="flex-1 min-w-0">
-              <div className="font-black text-sm text-[#0F172A] leading-tight truncate">
+              <h1 className="font-black text-base text-[#0F172A] leading-tight truncate">
                 {profile?.full_name}
-              </div>
-              {profile?.phone_number && (
-                <div className="text-xs text-[#475569] mt-0.5 font-semibold" dir="ltr">
-                  📞 {formatPhone(profile.phone_number)}
-                </div>
-              )}
-              <div className="flex flex-wrap gap-1 mt-1.5">
+              </h1>
+              <div className="flex flex-wrap items-center gap-1 mt-1">
                 <RoleBadge role={profile?.role} />
-                {profile?.status === "active" && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#10B981]/15 text-[#10B981]">
-                    ✅ نشط
-                  </span>
-                )}
                 {profile?.is_hr_member && (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#5438DC]/15 text-[#5438DC]">
-                    📋 لجنة شؤون العائلة
+                    📋 لجنة
                   </span>
                 )}
               </div>
+              {profile?.phone_number && (
+                <a
+                  href={`tel:${profile.phone_number}`}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-[#357DED] hover:underline mt-1.5"
+                  dir="ltr"
+                >
+                  📞 {formatPhone(profile.phone_number)}
+                </a>
+              )}
             </div>
           </div>
+
+          {/* بيانات إضافية مدمجة كأسطر */}
+          {(profile?.birth_date || profile?.created_at) && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 pt-3 border-t border-[#F1F5F9] text-xs">
+              {profile?.birth_date && (
+                <span className="text-[#64748B] font-semibold">
+                  🎂 <span className="text-[#0F172A]">{formatDate(profile.birth_date)}</span>
+                </span>
+              )}
+              {profile?.created_at && (
+                <span className="text-[#64748B] font-semibold">
+                  📅 انضم في <span className="text-[#0F172A]">{formatDate(profile.created_at)}</span>
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="mt-3">
             <EditMyProfileButton profile={profile} />
           </div>
         </div>
 
-        {/* Basic info */}
-        <Section title="📋" label="بيانات أساسية">
-          <Field label="الاسم الأول"   value={profile?.first_name ?? "—"} />
-          <Field label="الاسم الكامل"  value={profile?.full_name ?? "—"} />
-          {profile?.birth_date && (
-            <Field label="تاريخ الميلاد" value={new Date(profile.birth_date).toLocaleDateString("ar")} />
-          )}
-          <Field
-            label="الهاتف"
-            value={profile?.phone_number ? formatPhone(profile.phone_number) : "—"}
-            dir="ltr"
-          />
-        </Section>
-
-        {/* Father */}
+        {/* الأب */}
         {father && (
-          <Section title="👨" label="الأب">
+          <Section title="الأب" icon="👨">
             <PersonRow person={father} />
           </Section>
         )}
 
-        {/* Siblings */}
-        {siblings.length > 0 && (
-          <Section title="👥" label={`الإخوة (${siblings.length})`}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {siblings.map((s: any) => <PersonRow key={s.id} person={s} />)}
-            </div>
-          </Section>
-        )}
-
-        {/* Children */}
+        {/* الأبناء */}
         {children && children.length > 0 && (
-          <Section title="👨‍👦" label={`الأبناء (${children.length})`}>
+          <Section title="الأبناء" icon="👨‍👦" count={children.length}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {children.map((c: any) => <PersonRow key={c.id} person={c} />)}
             </div>
           </Section>
         )}
-
-        {/* Account info */}
-        <Section title="⚙️" label="معلومات الحساب">
-          <Field label="الدور"   value={roleAr(profile?.role)} />
-          <Field label="الحالة"  value={profile?.status === "active" ? "نشط ✅" : profile?.status ?? "—"} />
-          {profile?.created_at && (
-            <Field
-              label="تاريخ الانضمام"
-              value={new Date(profile.created_at).toLocaleDateString("ar")}
-            />
-          )}
-        </Section>
 
       </main>
     </PageBackground>
@@ -149,30 +112,36 @@ export default async function ProfilePage() {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function Section({ title, label, children }: { title: string; label: string; children: React.ReactNode }) {
+function Section({
+  title,
+  icon,
+  count,
+  children,
+}: {
+  title: string;
+  icon: string;
+  count?: number;
+  children: React.ReactNode;
+}) {
   return (
     <div className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#F1F5F9]">
-        <span>{title}</span>
-        <span className="font-black text-sm text-[#0F172A]">{label}</span>
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-[#F1F5F9] bg-[#F8FAFC]">
+        <span className="text-base">{icon}</span>
+        <span className="font-black text-sm text-[#0F172A]">{title}</span>
+        {count !== undefined && (
+          <span className="px-1.5 py-0 rounded-full bg-[#5438DC]/15 text-[#5438DC] text-[10px] font-black">
+            {count}
+          </span>
+        )}
       </div>
-      <div className="p-4">{children}</div>
-    </div>
-  );
-}
-
-function Field({ label, value, dir }: { label: string; value: string; dir?: "ltr" | "rtl" }) {
-  return (
-    <div className="flex items-center justify-between py-2 border-b border-[#F1F5F9] last:border-0">
-      <span className="text-xs text-[#64748B]">{label}</span>
-      <span className="font-bold text-sm text-[#0F172A]" dir={dir}>{value}</span>
+      <div className="p-2.5">{children}</div>
     </div>
   );
 }
 
 function PersonRow({ person }: { person: any }) {
   return (
-    <div className="flex items-center gap-2.5 p-3 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] hover:border-[#357DED] hover:shadow-sm transition">
+    <div className="flex items-center gap-2.5 p-2 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] hover:border-[#357DED] hover:shadow-sm transition">
       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#357DED] to-[#10B981] text-white flex items-center justify-center font-bold text-sm overflow-hidden flex-shrink-0">
         {person.avatar_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -183,7 +152,7 @@ function PersonRow({ person }: { person: any }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="font-bold text-sm text-[#0F172A] truncate">{person.full_name}</div>
-        <div className="text-xs text-[#64748B]">
+        <div className="text-[11px] text-[#64748B]">
           {person.is_deceased ? "🕊️ متوفى" : roleAr(person.role)}
         </div>
       </div>
@@ -205,7 +174,7 @@ function RoleBadge({ role }: { role?: string | null }) {
       className="px-2 py-0.5 rounded-full text-[10px] font-bold"
       style={{ background: `${color}15`, color }}
     >
-      {label}
+      ⭐ {label}
     </span>
   );
 }
@@ -223,4 +192,10 @@ function roleAr(role?: string | null): string {
     case "member":     return "عضو";
     default:           return "عضو";
   }
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat("ar", { day: "numeric", month: "long", year: "numeric" }).format(d);
 }
