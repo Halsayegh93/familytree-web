@@ -20,16 +20,15 @@ type Member = {
 };
 
 type StatusFilter = "all" | "living" | "deceased" | "frozen";
+type SortMode = "name" | "recent" | "role";
 
 // ─── Toast ───────────────────────────────────────────────────────────────────
 function useToast() {
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" | "" } | null>(null);
-
   const show = useCallback((msg: string, type: "success" | "error" | "" = "") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 2800);
   }, []);
-
   return { toast, show };
 }
 
@@ -50,16 +49,14 @@ function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 animate-in fade-in"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white w-full max-w-sm rounded-t-3xl p-5 pb-10 animate-in slide-in-from-bottom-4">
-        {/* Handle */}
+      <div className="bg-white w-full max-w-md rounded-t-3xl p-5 pb-10 animate-in slide-in-from-bottom-4">
         <div className="w-9 h-1 bg-[#E2E8F0] rounded-full mx-auto mb-4" />
 
-        {/* Member preview */}
         <div className="flex items-center gap-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 mb-4">
-          <Avatar member={member} size={36} radius={10} />
+          <Avatar member={member} size={44} radius={12} />
           <div>
             <div className="font-bold text-sm text-[#0F172A]">{member.full_name}</div>
             <div className="text-xs text-[#94A3B8]">
@@ -101,10 +98,17 @@ function ConfirmDialog({
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 function Avatar({ member, size = 40, radius = 12 }: { member: Member; size?: number; radius?: number }) {
+  const accentColor = roleColorOf(member.role);
   return (
     <div
-      className="bg-gradient-to-br from-[#357DED] to-[#10B981] text-white flex items-center justify-center font-bold overflow-hidden flex-shrink-0"
-      style={{ width: size, height: size, borderRadius: radius, fontSize: size * 0.38 }}
+      className="text-white flex items-center justify-center font-black overflow-hidden flex-shrink-0 shadow-sm"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: radius,
+        fontSize: size * 0.38,
+        background: `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
+      }}
     >
       {member.avatar_url ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -112,6 +116,192 @@ function Avatar({ member, size = 40, radius = 12 }: { member: Member; size?: num
       ) : (
         initials(member.full_name)
       )}
+    </div>
+  );
+}
+
+// ─── Member File Card (dossier-style) ─────────────────────────────────────────
+function MemberFileCard({
+  member,
+  canEdit,
+  busy,
+  onToggle,
+}: {
+  member: Member;
+  canEdit: boolean;
+  busy: boolean;
+  onToggle: (m: Member) => void;
+}) {
+  const accentColor = roleColorOf(member.role);
+  const status = member.is_deceased
+    ? { label: "متوفى", color: "#6B7B8D", emoji: "🕊️" }
+    : member.status === "frozen"
+    ? { label: "مجمّد", color: "#EF4444", emoji: "🔒" }
+    : { label: "نشط", color: "#10B981", emoji: "●" };
+
+  const dimmed = member.is_deceased || member.status === "frozen";
+
+  return (
+    <div
+      className={`bg-white rounded-2xl border overflow-hidden transition hover:shadow-md hover:-translate-y-0.5 group relative ${
+        dimmed ? "border-[#E2E8F0]" : "border-[#E2E8F0] hover:border-transparent"
+      }`}
+      style={!dimmed ? { } : {}}
+    >
+      {/* شريط علوي بلون الدور */}
+      <div className="h-1.5" style={{ background: accentColor }} />
+
+      <Link href={`/admin/profiles/${member.id}`} className="block p-4">
+        {/* صف رأسي: أفاتار + اسم + حالة */}
+        <div className="flex items-start gap-3 mb-3">
+          <Avatar member={member} size={56} radius={16} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start gap-2">
+              <h3
+                className={`flex-1 font-black text-sm leading-tight ${
+                  dimmed ? "text-[#94A3B8]" : "text-[#0F172A]"
+                }`}
+              >
+                {member.full_name}
+              </h3>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+              <Badge color={accentColor}>{roleAr(member.role)}</Badge>
+              <span
+                className="inline-flex items-center gap-1 text-[10px] font-black"
+                style={{ color: status.color }}
+              >
+                <span>{status.emoji}</span>
+                <span>{status.label}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* بيانات سريعة */}
+        <div className="space-y-1.5">
+          {member.phone_number && (
+            <InfoRow icon="📞" value={formatPhone(member.phone_number)} dir="ltr" />
+          )}
+          {member.birth_date && (
+            <InfoRow icon="🎂" value={formatBirthDate(member.birth_date)} />
+          )}
+          <InfoRow icon="📅" value={`سجل: ${formatJoinDate(member.created_at)}`} muted />
+        </div>
+      </Link>
+
+      {/* أزرار الإجراءات */}
+      {canEdit && !member.is_deceased && (
+        <div className="px-4 pb-3 pt-1 border-t border-[#F1F5F9] flex gap-2">
+          <Link
+            href={`/admin/profiles/${member.id}`}
+            className="flex-1 h-8 rounded-lg bg-[#F1F5F9] text-[#475569] text-xs font-bold flex items-center justify-center gap-1 hover:bg-[#357DED] hover:text-white transition"
+          >
+            <span>📂</span>
+            <span>فتح الملف</span>
+          </Link>
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              onToggle(member);
+            }}
+            disabled={busy}
+            className={`h-8 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-40 transition ${
+              member.status === "frozen"
+                ? "bg-[#10B981] text-white hover:opacity-90"
+                : "bg-[#FEF2F2] text-[#EF4444] hover:bg-[#FEE2E2]"
+            }`}
+          >
+            {busy ? "..." : member.status === "frozen" ? "🔓" : "🔒"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Member File Row (compact list) ───────────────────────────────────────────
+function MemberFileRow({
+  member,
+  canEdit,
+  busy,
+  onToggle,
+}: {
+  member: Member;
+  canEdit: boolean;
+  busy: boolean;
+  onToggle: (m: Member) => void;
+}) {
+  const accentColor = roleColorOf(member.role);
+  const dimmed = member.is_deceased || member.status === "frozen";
+
+  return (
+    <div className="flex items-center gap-3 px-3 py-2.5 hover:bg-[#F8FAFC] transition group relative">
+      {/* خط جانبي بلون الدور */}
+      <div className="absolute right-0 top-2 bottom-2 w-1 rounded-l" style={{ background: accentColor }} />
+
+      <Link
+        href={`/admin/profiles/${member.id}`}
+        className="flex items-center gap-3 flex-1 min-w-0 mr-2"
+      >
+        <Avatar member={member} size={42} radius={12} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span
+              className={`font-black text-sm truncate ${
+                dimmed ? "text-[#94A3B8]" : "text-[#0F172A]"
+              }`}
+            >
+              {member.full_name}
+            </span>
+            <Badge color={accentColor}>{roleAr(member.role)}</Badge>
+            {member.is_deceased && <Badge color="#6B7B8D">🕊️</Badge>}
+            {member.status === "frozen" && <Badge color="#EF4444">🔒 مجمّد</Badge>}
+          </div>
+          <div className="flex items-center gap-3 mt-0.5">
+            {member.phone_number && (
+              <span className="text-xs text-[#64748B] font-semibold" dir="ltr">
+                📞 {formatPhone(member.phone_number)}
+              </span>
+            )}
+            <span className="text-[11px] text-[#94A3B8]">
+              📅 {formatJoinDate(member.created_at)}
+            </span>
+          </div>
+        </div>
+      </Link>
+
+      {canEdit && !member.is_deceased && (
+        <button
+          onClick={() => onToggle(member)}
+          disabled={busy}
+          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold flex-shrink-0 transition disabled:opacity-40 ${
+            member.status === "frozen"
+              ? "bg-[#10B981] text-white hover:opacity-80"
+              : "bg-[#F1F5F9] text-[#EF4444] hover:bg-[#FEF2F2]"
+          }`}
+          title={member.status === "frozen" ? "تفعيل" : "تجميد"}
+        >
+          {busy ? "..." : member.status === "frozen" ? "🔓 تفعيل" : "🔒 تجميد"}
+        </button>
+      )}
+
+      <Link
+        href={`/admin/profiles/${member.id}`}
+        className="h-8 w-8 rounded-lg bg-[#F1F5F9] text-[#475569] flex items-center justify-center text-sm font-bold hover:bg-[#357DED] hover:text-white transition flex-shrink-0"
+        title="فتح الملف"
+      >
+        📂
+      </Link>
+    </div>
+  );
+}
+
+function InfoRow({ icon, value, dir, muted }: { icon: string; value: string; dir?: string; muted?: boolean }) {
+  return (
+    <div className={`flex items-center gap-1.5 text-xs ${muted ? "text-[#94A3B8]" : "text-[#64748B]"}`}>
+      <span className="text-[10px]">{icon}</span>
+      <span className="font-semibold truncate" dir={dir}>{value}</span>
     </div>
   );
 }
@@ -131,22 +321,18 @@ export function ProfilesListClient({
 
   const [members, setMembers] = useState(initialMembers);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<"grid" | "list">("list");
+  const [view, setView] = useState<"grid" | "list">("grid");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [displayLimit, setDisplayLimit] = useState(15);
+  const [sortMode, setSortMode] = useState<SortMode>("name");
+  const [displayLimit, setDisplayLimit] = useState(18);
   const [busy, setBusy] = useState<string | null>(null);
 
-  // Confirm dialog state
   const [confirmMember, setConfirmMember] = useState<Member | null>(null);
   const [confirmAction, setConfirmAction] = useState<"freeze" | "activate">("freeze");
 
-  // sync if server re-renders
   useEffect(() => { setMembers(initialMembers); }, [initialMembers]);
+  useEffect(() => { setDisplayLimit(18); }, [search, statusFilter, sortMode]);
 
-  // reset pagination on filter/search change
-  useEffect(() => { setDisplayLimit(15); }, [search, statusFilter]);
-
-  // ─── Counts ────────────────────────────────────────────────────────────────
   const counts = useMemo(() => ({
     all:      members.length,
     living:   members.filter((m) => !m.is_deceased && m.status !== "frozen").length,
@@ -154,7 +340,6 @@ export function ProfilesListClient({
     frozen:   members.filter((m) => m.status === "frozen").length,
   }), [members]);
 
-  // ─── Filtered ──────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let result = [...members];
     if (statusFilter === "living")   result = result.filter((m) => !m.is_deceased && m.status !== "frozen");
@@ -170,13 +355,22 @@ export function ProfilesListClient({
           (m.phone_number ?? "").includes(q)
       );
     }
+
+    if (sortMode === "recent") {
+      result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    } else if (sortMode === "role") {
+      const order: Record<string, number> = { owner: 0, admin: 1, monitor: 2, supervisor: 3, member: 4 };
+      result.sort((a, b) => (order[a.role] ?? 99) - (order[b.role] ?? 99));
+    } else {
+      result.sort((a, b) => a.full_name.localeCompare(b.full_name, "ar"));
+    }
+
     return result;
-  }, [members, search, statusFilter]);
+  }, [members, search, statusFilter, sortMode]);
 
   const visible = filtered.slice(0, displayLimit);
   const hasMore = filtered.length > displayLimit;
 
-  // ─── Toggle status ─────────────────────────────────────────────────────────
   function openConfirm(member: Member) {
     setConfirmMember(member);
     setConfirmAction(member.status === "frozen" ? "activate" : "freeze");
@@ -199,7 +393,6 @@ export function ProfilesListClient({
     if (error) {
       showToast(`خطأ: ${error.message}`, "error");
     } else {
-      // تحديث محلي فوري بدون انتظار router.refresh()
       setMembers((prev) =>
         prev.map((m) => (m.id === memberId ? { ...m, status: newStatus } : m))
       );
@@ -211,157 +404,145 @@ export function ProfilesListClient({
     }
   }
 
-  // ─── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
 
-      {/* Stat Cards */}
+      {/* === الإحصائيات === */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <StatCard icon="👥" value={counts.all}      label="إجمالي الأعضاء" color="#357DED" />
-        <StatCard icon="✅" value={counts.living}   label="أحياء"          color="#10B981" />
-        <StatCard icon="🕊️" value={counts.deceased} label="متوفون"         color="#6B7B8D" />
-        <StatCard icon="🔒" value={counts.frozen}   label="مجمّدون"        color="#EF4444" pulse={counts.frozen > 0} />
+        <StatCard icon="📁" value={counts.all}      label="إجمالي الملفات" color="#357DED" />
+        <StatCard icon="✅" value={counts.living}   label="ملفات نشطة"      color="#10B981" />
+        <StatCard icon="🕊️" value={counts.deceased} label="ملفات أرشيف"    color="#6B7B8D" />
+        <StatCard icon="🔒" value={counts.frozen}   label="ملفات مجمّدة"   color="#EF4444" pulse={counts.frozen > 0} />
       </div>
 
-      {/* Search + Filter card */}
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-3 space-y-2">
+      {/* === لوحة البحث والتحكم === */}
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-3 space-y-2.5">
+        {/* بحث + عرض */}
         <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="🔍 بحث بالاسم أو رقم الهاتف..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 px-4 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#357DED] text-[#0F172A] text-sm"
-          />
-          <button
-            onClick={() => setView(view === "grid" ? "list" : "grid")}
-            className="px-3 bg-[#F1F5F9] text-[#475569] rounded-xl font-bold text-sm hover:bg-[#E2E8F0] transition"
-            title={view === "grid" ? "عرض قائمة" : "عرض شبكة"}
-          >
-            {view === "grid" ? "☰" : "🔲"}
-          </button>
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              placeholder="🔍 بحث في الملفات بالاسم أو الهاتف..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pr-4 pl-10 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#357DED] text-[#0F172A] text-sm font-semibold"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-[#E2E8F0] text-[#64748B] text-xs hover:bg-[#CBD5E1]"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* تبديل العرض */}
+          <div className="flex bg-[#F1F5F9] rounded-xl p-0.5">
+            <button
+              onClick={() => setView("grid")}
+              className={`px-3 py-2 rounded-lg text-sm font-bold transition ${
+                view === "grid" ? "bg-white text-[#357DED] shadow-sm" : "text-[#64748B]"
+              }`}
+              title="ملفات (شبكة)"
+            >
+              🗂️
+            </button>
+            <button
+              onClick={() => setView("list")}
+              className={`px-3 py-2 rounded-lg text-sm font-bold transition ${
+                view === "list" ? "bg-white text-[#357DED] shadow-sm" : "text-[#64748B]"
+              }`}
+              title="قائمة"
+            >
+              ☰
+            </button>
+          </div>
         </div>
 
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
-          <FilterChip active={statusFilter === "all"}      onClick={() => setStatusFilter("all")}      label="الكل"     count={counts.all}      color="#5438DC" />
-          <FilterChip active={statusFilter === "living"}   onClick={() => setStatusFilter("living")}   label="الأحياء"  count={counts.living}   color="#10B981" />
-          <FilterChip active={statusFilter === "deceased"} onClick={() => setStatusFilter("deceased")} label="المتوفون" count={counts.deceased}  color="#6B7B8D" />
-          {counts.frozen > 0 && (
-            <FilterChip active={statusFilter === "frozen"} onClick={() => setStatusFilter("frozen")} label="🔒 مجمّدون" count={counts.frozen} color="#EF4444" />
-          )}
+        {/* الفلاتر + الترتيب */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5 flex-1">
+            <FilterChip active={statusFilter === "all"}      onClick={() => setStatusFilter("all")}      label="الكل"     count={counts.all}      color="#5438DC" />
+            <FilterChip active={statusFilter === "living"}   onClick={() => setStatusFilter("living")}   label="نشط"      count={counts.living}   color="#10B981" />
+            <FilterChip active={statusFilter === "deceased"} onClick={() => setStatusFilter("deceased")} label="أرشيف"    count={counts.deceased} color="#6B7B8D" />
+            {counts.frozen > 0 && (
+              <FilterChip active={statusFilter === "frozen"} onClick={() => setStatusFilter("frozen")} label="🔒 مجمّد" count={counts.frozen} color="#EF4444" />
+            )}
+          </div>
+
+          {/* ترتيب */}
+          <select
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value as SortMode)}
+            className="px-3 py-1.5 rounded-full bg-[#F1F5F9] text-xs font-bold text-[#475569] outline-none focus:ring-2 focus:ring-[#357DED] cursor-pointer"
+          >
+            <option value="name">↓ بالاسم</option>
+            <option value="recent">↓ الأحدث</option>
+            <option value="role">↓ الدور</option>
+          </select>
         </div>
       </div>
 
-      {/* Result count hint */}
+      {/* === عداد النتائج === */}
       {(search || statusFilter !== "all") && (
-        <div className="text-xs text-[#94A3B8] px-1">
-          {filtered.length} نتيجة
+        <div className="text-xs text-[#64748B] px-1 font-bold">
+          📊 {filtered.length} ملف
         </div>
       )}
 
-      {/* Empty state */}
+      {/* === الفراغ === */}
       {filtered.length === 0 && (
         <div className="bg-white rounded-2xl border border-[#E2E8F0] p-14 text-center">
-          <div className="text-5xl mb-3">🔍</div>
-          <p className="text-[#64748B]">لا توجد نتائج</p>
+          <div className="text-5xl mb-3">📂</div>
+          <p className="text-[#0F172A] font-bold mb-1">لا توجد ملفات مطابقة</p>
+          <p className="text-[#64748B] text-sm">جرّب تعديل البحث أو الفلتر</p>
         </div>
       )}
 
-      {/* Grid view */}
+      {/* === عرض الشبكة (ملفات) === */}
       {filtered.length > 0 && view === "grid" && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {visible.map((m) => (
-            <Link
+            <MemberFileCard
               key={m.id}
-              href={`/admin/profiles/${m.id}`}
-              className="bg-white rounded-2xl border border-[#E2E8F0] hover:shadow-sm hover:border-[#357DED] transition p-4 text-center"
-            >
-              <div className="w-20 h-20 mx-auto rounded-2xl overflow-hidden mb-3">
-                <Avatar member={m} size={80} radius={16} />
-              </div>
-              <div className="font-bold text-[#0F172A] truncate text-sm">{m.full_name}</div>
-              <div className="flex items-center justify-center gap-1 mt-1 flex-wrap">
-                <Badge color={roleColorOf(m.role)}>{roleAr(m.role)}</Badge>
-                {m.is_deceased && <Badge color="#6B7B8D">🕊️</Badge>}
-                {m.status === "frozen" && <Badge color="#EF4444">🔒</Badge>}
-              </div>
-            </Link>
+              member={m}
+              canEdit={canEdit}
+              busy={busy === m.id}
+              onToggle={openConfirm}
+            />
           ))}
         </div>
       )}
 
-      {/* List view */}
+      {/* === عرض القائمة === */}
       {filtered.length > 0 && view === "list" && (
         <div className="bg-white rounded-2xl border border-[#E2E8F0] divide-y divide-[#F1F5F9] overflow-hidden">
           {visible.map((m) => (
-            <div key={m.id} className="flex items-center gap-3 px-3 py-2 hover:bg-[#F8FAFC] transition">
-              <Link
-                href={`/admin/profiles/${m.id}`}
-                className="flex items-center gap-3 flex-1 min-w-0"
-              >
-                <Avatar member={m} size={40} radius={12} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span
-                      className={`font-bold text-sm truncate ${
-                        m.is_deceased || m.status === "frozen"
-                          ? "text-[#94A3B8]"
-                          : "text-[#0F172A]"
-                      }`}
-                    >
-                      {m.full_name}
-                    </span>
-                    <Badge color={roleColorOf(m.role)}>{roleAr(m.role)}</Badge>
-                    {m.is_deceased && <Badge color="#6B7B8D">🕊️</Badge>}
-                    {m.status === "frozen" && <Badge color="#EF4444">🔒 مجمّد</Badge>}
-                  </div>
-                  {m.phone_number && (
-                    <div className="text-xs text-[#94A3B8] mt-0.5" dir="ltr">
-                      {formatPhone(m.phone_number)}
-                    </div>
-                  )}
-                </div>
-              </Link>
-
-              {canEdit && !m.is_deceased && (
-                <button
-                  onClick={() => openConfirm(m)}
-                  disabled={busy === m.id}
-                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold flex-shrink-0 transition disabled:opacity-40 ${
-                    m.status === "frozen"
-                      ? "bg-[#10B981] text-white hover:opacity-80"
-                      : "bg-[#F1F5F9] text-[#EF4444] hover:bg-[#FEF2F2]"
-                  }`}
-                  title={m.status === "frozen" ? "تفعيل" : "تجميد"}
-                >
-                  {busy === m.id ? "..." : m.status === "frozen" ? "🔓 تفعيل" : "🔒 تجميد"}
-                </button>
-              )}
-
-              <Link
-                href={`/admin/profiles/${m.id}`}
-                className="text-xs text-[#94A3B8] hover:text-[#5438DC] flex-shrink-0 transition"
-              >
-                ←
-              </Link>
-            </div>
+            <MemberFileRow
+              key={m.id}
+              member={m}
+              canEdit={canEdit}
+              busy={busy === m.id}
+              onToggle={openConfirm}
+            />
           ))}
         </div>
       )}
 
-      {/* Load more */}
+      {/* === تحميل المزيد === */}
       {hasMore && (
         <div className="text-center pt-1">
           <button
-            onClick={() => setDisplayLimit((l) => l + 15)}
-            className="px-6 py-2 rounded-full border-2 border-[#357DED] text-[#357DED] text-sm font-bold hover:bg-[#EBF3FE] transition"
+            onClick={() => setDisplayLimit((l) => l + 18)}
+            className="px-6 py-2.5 rounded-full bg-white border-2 border-[#357DED] text-[#357DED] text-sm font-black hover:bg-[#EBF3FE] transition"
           >
-            عرض المزيد ({filtered.length - displayLimit} متبقي) ▾
+            تحميل المزيد ({filtered.length - displayLimit} متبقي) ▾
           </button>
         </div>
       )}
 
-      {/* Confirm Dialog */}
+      {/* === Confirm Dialog === */}
       {confirmMember && (
         <ConfirmDialog
           member={confirmMember}
@@ -371,7 +552,7 @@ export function ProfilesListClient({
         />
       )}
 
-      {/* Toast */}
+      {/* === Toast === */}
       {toast && (
         <div
           className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl text-white text-sm font-semibold shadow-lg whitespace-nowrap transition-all ${
@@ -396,19 +577,19 @@ function StatCard({
   icon: string; value: number; label: string; color: string; pulse?: boolean;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-[#E2E8F0] p-3 flex items-center gap-2.5 relative hover:shadow-sm transition hover:-translate-y-0.5">
+    <div className="bg-white rounded-2xl border border-[#E2E8F0] p-3 flex items-center gap-2.5 relative hover:shadow-sm transition hover:-translate-y-0.5 overflow-hidden">
       {pulse && value > 0 && (
         <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-[#EF4444] animate-pulse" />
       )}
       <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+        className="w-11 h-11 rounded-xl flex items-center justify-center text-lg flex-shrink-0 shadow-sm"
         style={{ background: `${color}15`, color }}
       >
         {icon}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-lg font-black text-[#0F172A] leading-tight">{value}</div>
-        <div className="text-xs text-[#64748B] truncate">{label}</div>
+        <div className="text-xl font-black text-[#0F172A] leading-tight">{value}</div>
+        <div className="text-[11px] text-[#64748B] truncate font-semibold">{label}</div>
       </div>
     </div>
   );
@@ -442,7 +623,7 @@ function FilterChip({
 function Badge({ color, children }: { color: string; children: React.ReactNode }) {
   return (
     <span
-      className="px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap"
+      className="px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap"
       style={{ background: `${color}18`, color }}
     >
       {children}
@@ -471,4 +652,16 @@ function roleColorOf(role: string): string {
     case "supervisor": return "#F59E0B";
     default:           return "#357DED";
   }
+}
+
+function formatBirthDate(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat("ar", { day: "numeric", month: "long", year: "numeric" }).format(d);
+}
+
+function formatJoinDate(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat("ar", { day: "numeric", month: "short", year: "numeric" }).format(d);
 }
