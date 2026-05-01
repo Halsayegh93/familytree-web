@@ -371,6 +371,8 @@ function FocusedMemberCard({
             <Pill color={roleColor}>⭐ {roleAr(member.role)}</Pill>
             {member.is_deceased && <Pill color="#6B7B8D">🕊️ متوفى</Pill>}
             <Pill color="#F59E0B">📍 الجيل {generation + 1}</Pill>
+            <Pill color="#5438DC">👨‍👦 {childrenCount} أبناء</Pill>
+            <Pill color="#10B981">🌳 {totalDescendants} ذرّية</Pill>
           </div>
         </div>
 
@@ -396,39 +398,34 @@ function FocusedMemberCard({
         </div>
       </div>
 
-      {/* البيانات مع المسميات */}
-      <div className="px-4 py-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <DataField label="الأبناء" icon="👨‍👦" value={String(childrenCount)} color="#5438DC" />
-        <DataField label="إجمالي الذرّية" icon="🌳" value={String(totalDescendants)} color="#10B981" />
-        {/* إخفاء الهاتف والميلاد إذا متوفى — احتراماً */}
-        {member.is_deceased ? (
-          <>
-            {member.death_date && (
-              <DataField label="الوفاة" icon="🕊️" value={formatDate(member.death_date)} color="#6B7B8D" />
-            )}
-          </>
-        ) : (
-          <>
-            {member.phone_number ? (
-              <DataField
-                label="الهاتف"
-                icon="📞"
-                value={formatPhone(member.phone_number)}
-                color="#357DED"
-                href={`tel:${member.phone_number}`}
-                dir="ltr"
-              />
-            ) : (
-              <DataField label="الهاتف" icon="📞" value="—" color="#94A3B8" muted />
-            )}
-            {member.birth_date ? (
-              <DataField label="الميلاد" icon="🎂" value={formatDate(member.birth_date)} color="#EC4899" />
-            ) : (
-              <DataField label="الميلاد" icon="🎂" value="—" color="#94A3B8" muted />
-            )}
-          </>
-        )}
-      </div>
+      {/* البيانات الشخصية — تُخفى للمتوفى احتراماً */}
+      {member.is_deceased ? (
+        member.death_date && (
+          <div className="px-4 py-2.5">
+            <DataField label="الوفاة" icon="🕊️" value={formatDate(member.death_date)} color="#6B7B8D" />
+          </div>
+        )
+      ) : (
+        <div className="px-4 py-2.5 grid grid-cols-2 gap-2">
+          {member.phone_number ? (
+            <DataField
+              label="الهاتف"
+              icon="📞"
+              value={formatPhone(member.phone_number)}
+              color="#357DED"
+              href={`tel:${member.phone_number}`}
+              dir="ltr"
+            />
+          ) : (
+            <DataField label="الهاتف" icon="📞" value="—" color="#94A3B8" muted />
+          )}
+          {member.birth_date ? (
+            <DataField label="الميلاد" icon="🎂" value={formatDate(member.birth_date)} color="#EC4899" />
+          ) : (
+            <DataField label="الميلاد" icon="🎂" value="—" color="#94A3B8" muted />
+          )}
+        </div>
+      )}
     </div>
   );
 }
