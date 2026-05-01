@@ -393,22 +393,20 @@ function FocusedMemberCard({
 
       {/* شريط الإجراءات السفلي (للمدراء) */}
       {canModerate && (
-        <div className="flex border-t border-[#E2E8F0] divide-x divide-[#E2E8F0]">
+        <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-[#E2E8F0]">
           <Link
             href={`/admin/profiles/${member.id}`}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-bold text-[#357DED] hover:bg-[#EBF3FE] transition"
+            className="w-9 h-9 rounded-xl bg-[#F1F5F9] text-[#475569] flex items-center justify-center text-base hover:bg-[#357DED] hover:text-white transition"
+            title="فتح الملف الكامل"
           >
-            <span>📂</span>
-            <span>فتح الملف الكامل</span>
+            📂
           </Link>
-          <div className="flex items-center justify-center px-1">
-            <MemberFullEditClient
-              key={member.id}
-              member={member}
-              canManageRoles={canModerate}
-              variant="icon"
-            />
-          </div>
+          <MemberFullEditClient
+            key={member.id}
+            member={member}
+            canManageRoles={canModerate}
+            variant="icon"
+          />
         </div>
       )}
     </div>
