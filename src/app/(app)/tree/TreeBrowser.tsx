@@ -244,7 +244,7 @@ export function TreeBrowser({
           {/* ═══════ الأشقاء ═══════ */}
           {siblings.length > 0 && (
             <Section
-              title="الإخوة والأخوات"
+              title="الإخوة"
               count={siblings.length}
               icon="👥"
               color="#F59E0B"
@@ -316,24 +316,25 @@ function FocusedMemberCard({
   onFatherClick: () => void;
 }) {
   const roleColor = roleColorOf(member.role);
+  void generation; // مخفي بناءً على طلب المستخدم
+  void childrenCount;
 
   return (
     <div
-      className="bg-white rounded-2xl border-2 shadow-md overflow-hidden"
+      className="relative bg-white rounded-2xl border-2 shadow-md overflow-hidden"
       style={{ borderColor: `${roleColor}40` }}
     >
       {/* رأس البطاقة */}
       <div
-        className="px-4 py-3 flex items-center gap-3"
+        className="px-4 py-4 flex items-center gap-4"
         style={{
           background: `linear-gradient(135deg, ${roleColor}15, ${roleColor}05)`,
-          borderBottom: `1px solid ${roleColor}20`,
         }}
       >
-        {/* الصورة */}
+        {/* الصورة (مكبّرة) */}
         <div className="relative flex-shrink-0">
           <div
-            className="w-20 h-20 rounded-2xl flex items-center justify-center text-3xl font-black text-white overflow-hidden shadow-lg ring-3 ring-white"
+            className="w-28 h-28 md:w-32 md:h-32 rounded-2xl flex items-center justify-center text-5xl font-black text-white overflow-hidden shadow-lg ring-4 ring-white"
             style={{
               background: `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)`,
             }}
@@ -345,44 +346,31 @@ function FocusedMemberCard({
               member.full_name.charAt(0)
             )}
           </div>
-          {member.is_deceased && (
-            <div className="absolute -bottom-1 -right-1 bg-[#6B7B8D] text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md">
-              🕊️
-            </div>
-          )}
         </div>
 
-        {/* الاسم + شارات الدور والأب */}
+        {/* الاسم + بيانات */}
         <div className="flex-1 min-w-0">
           {father && (
             <button
               onClick={onFatherClick}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-black transition hover:scale-105 mb-1"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-black transition hover:scale-105 mb-1.5"
               style={{ background: `${roleColor}25`, color: roleColor }}
             >
               <span>↑</span>
               <span>ابن {father.first_name}</span>
             </button>
           )}
-          <h2 className="font-black text-[#0F172A] text-base md:text-lg leading-tight">
+          <h2 className="font-black text-[#0F172A] text-lg md:text-xl leading-tight">
             {member.full_name}
           </h2>
-          <div className="flex flex-wrap items-center gap-1 mt-1">
-            <Pill color={roleColor}>⭐ {roleAr(member.role)}</Pill>
-            <Pill color="#F59E0B">📍 الجيل {generation + 1}</Pill>
-            <Pill color="#5438DC">👨‍👦 {childrenCount}</Pill>
-            <Pill color="#10B981">🌳 {totalDescendants}</Pill>
-            {/* المتوفى: تاريخ الوفاة فقط */}
+          <div className="flex flex-wrap items-center gap-1 mt-2">
+            <Pill color="#10B981">🌳 {totalDescendants} ذرّية</Pill>
             {member.is_deceased ? (
-              <>
-                <Pill color="#6B7B8D">🕊️ متوفى</Pill>
-                {member.death_date && (
-                  <Pill color="#6B7B8D">🕊️ {formatDate(member.death_date)}</Pill>
-                )}
-              </>
+              member.death_date && (
+                <Pill color="#6B7B8D">🕊️ {formatDate(member.death_date)}</Pill>
+              )
             ) : (
               <>
-                {/* الأحياء: هاتف + ميلاد */}
                 {member.phone_number && (
                   <a
                     href={`tel:${member.phone_number}`}
@@ -399,29 +387,28 @@ function FocusedMemberCard({
             )}
           </div>
         </div>
+      </div>
 
-        {/* أزرار سريعة */}
-        <div className="flex flex-col gap-1.5 flex-shrink-0">
-          {canModerate && (
+      {/* شريط الإجراءات السفلي (للمدراء) */}
+      {canModerate && (
+        <div className="flex border-t border-[#E2E8F0] divide-x divide-[#E2E8F0]">
+          <Link
+            href={`/admin/profiles/${member.id}`}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-bold text-[#357DED] hover:bg-[#EBF3FE] transition"
+          >
+            <span>📂</span>
+            <span>فتح الملف الكامل</span>
+          </Link>
+          <div className="flex items-center justify-center px-1">
             <MemberFullEditClient
               key={member.id}
               member={member}
               canManageRoles={canModerate}
               variant="icon"
             />
-          )}
-          {canModerate && (
-            <Link
-              href={`/admin/profiles/${member.id}`}
-              className="w-9 h-9 rounded-xl bg-white border border-[#E2E8F0] flex items-center justify-center text-base hover:bg-[#357DED] hover:text-white hover:border-[#357DED] transition shadow-sm"
-              title="فتح الملف الكامل"
-            >
-              📂
-            </Link>
-          )}
+          </div>
         </div>
-      </div>
-
+      )}
     </div>
   );
 }
