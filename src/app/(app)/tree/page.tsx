@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getProfileId } from "@/lib/get-profile-id";
-import { PageHero, PageBackground } from "@/components/PageHero";
+import { PageBackground } from "@/components/PageHero";
 import { TreeBrowser } from "./TreeBrowser";
 
 const MODERATOR_ROLES = ["owner", "admin", "monitor", "supervisor"];
@@ -30,12 +30,17 @@ export default async function TreePage() {
 
   return (
     <PageBackground theme="tree">
-      <main className="max-w-6xl mx-auto p-6 space-y-4">
-        <PageHero
-          theme="tree"
-          title="شجرة العائلة"
-          subtitle={`تصفّح شجرة العائلة الكاملة — ${visible.length} عضو`}
-        />
+      <main className="max-w-6xl mx-auto px-3 md:px-4 py-3 space-y-2">
+        {/* Hero مدمج صغير */}
+        <div className="flex items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🌳</span>
+            <div>
+              <h1 className="text-lg font-black text-[#0F172A] leading-tight">شجرة العائلة</h1>
+              <p className="text-xs text-[#64748B]">{visible.length} عضو</p>
+            </div>
+          </div>
+        </div>
 
         <TreeBrowser members={visible} canModerate={canModerate} isHR={isHR} />
       </main>

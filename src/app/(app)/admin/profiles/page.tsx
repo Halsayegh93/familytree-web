@@ -31,6 +31,31 @@ export default async function AdminProfilesPage() {
     .order("full_name", { ascending: true })
     .limit(10000);
 
+  // جلب حالة النشاط للأعضاء (last_sign_in_at من auth)
+  let activityMap: Record<string, { is_active: boolean; days_since_active: number | null; last_sign_in_at: string | null }> = {};
+  if (members && members.length > 0) {
+    const { data: activity } = await supabase.rpc("get_members_activity", {
+      member_ids: members.map((m: any) => m.id),
+    });
+    if (activity) {
+      activityMap = (activity as any[]).reduce((acc, row) => {
+        acc[row.member_id] = {
+          is_active: row.is_active,
+          days_since_active: row.days_since_active,
+          last_sign_in_at: row.last_sign_in_at,
+        };
+        return acc;
+      }, {} as typeof activityMap);
+    }
+  }
+
+  const membersWithActivity = (members ?? []).map((m: any) => ({
+    ...m,
+    is_active: activityMap[m.id]?.is_active ?? false,
+    days_since_active: activityMap[m.id]?.days_since_active ?? null,
+    last_sign_in_at: activityMap[m.id]?.last_sign_in_at ?? null,
+  }));
+
   // بيانات لوحة المتابعة (لأعضاء اللجنة فقط)
   let trackedMembers: any[] = [];
   let recentNotes: any[] = [];
@@ -102,7 +127,7 @@ export default async function AdminProfilesPage() {
           showFollowUp={isHR}
           members={
             <ProfilesListClient
-              members={members ?? []}
+              members={membersWithActivity}
               canEdit={canEdit}
               isHR={isHR}
             />

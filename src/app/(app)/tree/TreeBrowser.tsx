@@ -131,9 +131,9 @@ export function TreeBrowser({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-1.5">
       {/* ═══════ شريط الأدوات (مختصر) ═══════ */}
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-2.5 sticky top-14 z-30 shadow-sm space-y-2">
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-2 sticky top-14 z-30 shadow-sm space-y-1.5">
         <div className="flex gap-2">
           <div className="flex-1 relative">
             <input
@@ -250,7 +250,7 @@ export function TreeBrowser({
               color="#F59E0B"
               compact
             >
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1">
                 {siblings.map((s) => (
                   <NodeCard
                     key={s.id}
@@ -271,23 +271,24 @@ export function TreeBrowser({
               count={directChildren.length}
               icon="👨‍👦"
               color="#5438DC"
+              compact
             >
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1">
                 {directChildren.map((c) => (
                   <NodeCard
                     key={c.id}
                     member={c}
                     onClick={() => focus(c.id)}
                     childrenCount={childrenByFather.get(c.id)?.length ?? 0}
+                    compact
                   />
                 ))}
               </div>
             </Section>
           ) : (
-            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-8 text-center">
-              <div className="text-4xl mb-2">🍃</div>
-              <p className="text-[#0F172A] font-bold mb-0.5">نهاية الفرع</p>
-              <p className="text-[#64748B] text-xs">لا يوجد أبناء مسجّلين</p>
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 text-center">
+              <div className="text-3xl mb-1">🍃</div>
+              <p className="text-[#0F172A] font-bold text-sm">نهاية الفرع</p>
             </div>
           )}
         </>
@@ -317,170 +318,97 @@ function FocusedMemberCard({
   const roleColor = roleColorOf(member.role);
 
   return (
-    <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-sm overflow-hidden">
-      {/* الرأس مع تدرج */}
-      <div
-        className="relative px-5 pt-5 pb-4"
-        style={{
-          background: `linear-gradient(135deg, ${roleColor}12, ${roleColor}05)`,
-          borderBottom: `1px solid ${roleColor}25`,
-        }}
-      >
-        {/* زر التعديل (للمدراء) */}
-        {canModerate && (
-          <div className="absolute top-3 left-3">
+    <div
+      className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden p-2.5"
+      style={{
+        background: `linear-gradient(135deg, ${roleColor}10, ${roleColor}03)`,
+      }}
+    >
+      <div className="flex items-center gap-3">
+        {/* الصورة */}
+        <div className="relative flex-shrink-0">
+          <div
+            className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-black text-white overflow-hidden shadow-md ring-2 ring-white"
+            style={{
+              background: `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)`,
+            }}
+          >
+            {member.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              member.full_name.charAt(0)
+            )}
+          </div>
+          {member.is_deceased && (
+            <div className="absolute -bottom-0.5 -right-0.5 bg-[#6B7B8D] text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] shadow">
+              🕊️
+            </div>
+          )}
+        </div>
+
+        {/* المعلومات */}
+        <div className="flex-1 min-w-0">
+          {/* صف ١: زر الأب + الاسم */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {father && (
+              <button
+                onClick={onFatherClick}
+                className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold transition hover:scale-105 flex-shrink-0"
+                style={{ background: `${roleColor}20`, color: roleColor }}
+              >
+                <span>↑</span>
+                <span>{father.first_name}</span>
+              </button>
+            )}
+            <h2 className="font-black text-[#0F172A] text-sm md:text-base leading-tight truncate">
+              {member.full_name}
+            </h2>
+          </div>
+
+          {/* صف ٢: شارات + إحصائيات */}
+          <div className="flex flex-wrap items-center gap-1 mt-1">
+            <Pill color={roleColor}>{roleAr(member.role)}</Pill>
+            <Pill color="#5438DC">👨‍👦 {childrenCount}</Pill>
+            <Pill color="#10B981">🌳 {totalDescendants}</Pill>
+            <Pill color="#F59E0B">📍 ج{generation + 1}</Pill>
+            {member.phone_number && (
+              <a
+                href={`tel:${member.phone_number}`}
+                dir="ltr"
+                className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#357DED]/15 text-[#357DED] hover:bg-[#357DED] hover:text-white transition"
+              >
+                📞 {formatPhone(member.phone_number)}
+              </a>
+            )}
+            {member.birth_date && (
+              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#F1F5F9] text-[#475569]">
+                🎂 {formatDate(member.birth_date)}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* أزرار سريعة */}
+        <div className="flex flex-col gap-1 flex-shrink-0">
+          {canModerate && (
             <MemberFullEditClient
               key={member.id}
               member={member}
               canManageRoles={canModerate}
               variant="icon"
             />
-          </div>
-        )}
-
-        {/* رابط الأب */}
-        {father && (
-          <button
-            onClick={onFatherClick}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition mb-3 hover:scale-105"
-            style={{ background: `${roleColor}20`, color: roleColor }}
-          >
-            <span>👨</span>
-            <span>ابن {father.first_name}</span>
-            <span>↑</span>
-          </button>
-        )}
-
-        {/* الصورة + الاسم */}
-        <div className="flex flex-col items-center gap-3">
-          <div className="relative">
-            <div
-              className="w-24 h-24 rounded-3xl flex items-center justify-center text-4xl font-black text-white overflow-hidden shadow-lg ring-4 ring-white"
-              style={{
-                background: `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)`,
-              }}
+          )}
+          {canModerate && (
+            <Link
+              href={`/admin/profiles/${member.id}`}
+              className="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] flex items-center justify-center text-sm hover:bg-[#357DED] hover:text-white hover:border-[#357DED] transition"
+              title="فتح الملف"
             >
-              {member.avatar_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
-              ) : (
-                member.full_name.charAt(0)
-              )}
-            </div>
-            {member.is_deceased && (
-              <div className="absolute -bottom-1 -right-1 bg-[#6B7B8D] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm shadow-md">
-                🕊️
-              </div>
-            )}
-          </div>
-
-          <div className="text-center">
-            <h2 className="text-lg md:text-xl font-black text-[#0F172A] leading-tight">
-              {member.full_name}
-            </h2>
-            <div className="flex flex-wrap items-center justify-center gap-1.5 mt-2">
-              <Pill color={roleColor}>⭐ {roleAr(member.role)}</Pill>
-              {generation > 0 && (
-                <Pill color="#5438DC">🌳 الجيل {generation + 1}</Pill>
-              )}
-              {member.is_deceased && <Pill color="#6B7B8D">🕊️ متوفى</Pill>}
-            </div>
-          </div>
+              📂
+            </Link>
+          )}
         </div>
-      </div>
-
-      {/* الإحصائيات السريعة */}
-      <div className="grid grid-cols-3 divide-x divide-[#E2E8F0] border-b border-[#E2E8F0]">
-        <StatBox icon="👨‍👦" value={childrenCount} label="أبناء" color="#5438DC" />
-        <StatBox icon="🌳" value={totalDescendants} label="ذرّية" color="#10B981" />
-        <StatBox icon="📍" value={generation + 1} label="الجيل" color="#F59E0B" />
-      </div>
-
-      {/* تفاصيل إضافية */}
-      <div className="p-4 space-y-2">
-        {member.birth_date && (
-          <DetailRow icon="🎂" label="الميلاد" value={formatDate(member.birth_date)} />
-        )}
-        {member.death_date && (
-          <DetailRow icon="🕊️" label="الوفاة" value={formatDate(member.death_date)} />
-        )}
-        {member.phone_number && (
-          <DetailRow
-            icon="📞"
-            label="الهاتف"
-            value={
-              <a
-                href={`tel:${member.phone_number}`}
-                dir="ltr"
-                className="text-[#357DED] hover:underline font-black"
-              >
-                {formatPhone(member.phone_number)}
-              </a>
-            }
-          />
-        )}
-        {/* إذا ما فيه أي تفاصيل، أضف ملاحظة */}
-        {!member.birth_date && !member.death_date && !member.phone_number && (
-          <div className="text-center text-xs text-[#94A3B8] py-2">
-            لا توجد بيانات إضافية
-          </div>
-        )}
-      </div>
-
-      {/* رابط الملف الكامل (للمدراء) */}
-      {canModerate && (
-        <Link
-          href={`/admin/profiles/${member.id}`}
-          className="block text-center px-4 py-2.5 bg-[#F8FAFC] hover:bg-[#357DED] hover:text-white text-[#357DED] font-bold text-sm border-t border-[#E2E8F0] transition"
-        >
-          📂 فتح الملف الكامل ←
-        </Link>
-      )}
-    </div>
-  );
-}
-
-// ═══════════ Stat Box ═══════════
-function StatBox({
-  icon,
-  value,
-  label,
-  color,
-}: {
-  icon: string;
-  value: number;
-  label: string;
-  color: string;
-}) {
-  return (
-    <div className="text-center py-3">
-      <div className="text-2xl mb-1">{icon}</div>
-      <div className="text-xl font-black" style={{ color }}>
-        {value}
-      </div>
-      <div className="text-[11px] text-[#64748B] font-bold">{label}</div>
-    </div>
-  );
-}
-
-// ═══════════ Detail Row ═══════════
-function DetailRow({
-  icon,
-  label,
-  value,
-}: {
-  icon: string;
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center gap-2 px-1 py-1.5 rounded-lg hover:bg-[#F8FAFC] transition">
-      <div className="w-8 h-8 rounded-lg bg-[#F1F5F9] flex items-center justify-center text-base flex-shrink-0">
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-[10px] text-[#94A3B8] font-bold">{label}</div>
-        <div className="text-sm text-[#0F172A] font-black">{value}</div>
       </div>
     </div>
   );
@@ -517,23 +445,23 @@ function Section({
   return (
     <div className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden">
       <div
-        className="px-4 py-2.5 flex items-center justify-between border-b border-[#E2E8F0]"
+        className="px-3 py-1.5 flex items-center justify-between border-b border-[#E2E8F0]"
         style={{ background: `${color}08` }}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-lg">{icon}</span>
-          <h3 className="font-black text-sm md:text-base" style={{ color }}>
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm">{icon}</span>
+          <h3 className="font-black text-xs" style={{ color }}>
             {title}
           </h3>
           <span
-            className="px-2 py-0.5 rounded-full text-[10px] font-black"
+            className="px-1.5 py-0 rounded-full text-[10px] font-black"
             style={{ background: color, color: "white" }}
           >
             {count}
           </span>
         </div>
       </div>
-      <div className={compact ? "p-2" : "p-3"}>{children}</div>
+      <div className={compact ? "p-1.5" : "p-2"}>{children}</div>
     </div>
   );
 }
@@ -556,20 +484,14 @@ function NodeCard({
   return (
     <button
       onClick={onClick}
-      className={`group bg-white rounded-xl border border-[#E2E8F0] hover:border-[#10B981] hover:shadow-md hover:-translate-y-0.5 transition w-full text-center overflow-hidden ${
-        compact ? "p-2" : "p-3"
+      className={`group relative bg-white rounded-lg border border-[#E2E8F0] hover:border-[#10B981] hover:shadow-sm transition w-full text-right overflow-hidden ${
+        compact ? "p-1.5" : "p-2"
       }`}
     >
-      {/* أعلى البطاقة: شريط ملوّن */}
-      <div
-        className="absolute top-0 left-0 right-0 h-0.5"
-        style={{ background: roleColor }}
-      />
-
-      <div className="flex flex-col items-center gap-1.5">
+      <div className="flex items-center gap-2">
         <div
-          className={`rounded-xl flex items-center justify-center text-white font-black overflow-hidden flex-shrink-0 transition-transform group-hover:scale-110 ${
-            compact ? "w-9 h-9 text-base" : "w-12 h-12 text-xl"
+          className={`rounded-lg flex items-center justify-center text-white font-black overflow-hidden flex-shrink-0 transition-transform group-hover:scale-110 ${
+            compact ? "w-8 h-8 text-xs" : "w-9 h-9 text-sm"
           } ${dimmed ? "grayscale opacity-70" : ""}`}
           style={{
             background: `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)`,
@@ -582,22 +504,21 @@ function NodeCard({
             member.first_name.charAt(0)
           )}
         </div>
-
-        <div className="w-full">
+        <div className="flex-1 min-w-0">
           <div
-            className={`font-black truncate ${compact ? "text-xs" : "text-sm"} ${
+            className={`font-black truncate ${compact ? "text-[11px]" : "text-xs"} ${
               dimmed ? "text-[#94A3B8]" : "text-[#0F172A]"
             }`}
           >
             {member.first_name}
           </div>
-          <div className="flex items-center justify-center gap-1 flex-wrap mt-0.5 min-h-[16px]">
+          <div className="flex items-center gap-0.5 flex-wrap">
             {member.is_deceased && (
               <span className="text-[9px] text-[#6B7B8D]">🕊️</span>
             )}
             {childrenCount > 0 && (
               <span
-                className="px-1.5 py-0.5 rounded-full text-[9px] font-black"
+                className="px-1 py-0 rounded-full text-[9px] font-black"
                 style={{ background: `${roleColor}18`, color: roleColor }}
               >
                 +{childrenCount}
