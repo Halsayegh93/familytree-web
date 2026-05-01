@@ -28,6 +28,10 @@ export default async function AppLayout({
   // عضو معلق — وجّهه لصفحة الانتظار
   if (profile?.status === "pending") redirect("/pending");
 
+  // تحديث last_active_at — يُعتبر العضو نشطاً مع كل زيارة
+  // fire-and-forget، لا ننتظره حتى لا نُبطئ التحميل
+  void supabase.rpc("touch_last_active");
+
   const canModerate = MODERATOR_ROLES.includes(profile?.role ?? "");
   const isHR = profile?.is_hr_member === true;
 
