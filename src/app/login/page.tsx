@@ -52,8 +52,14 @@ export default function LoginPage() {
       token: otp,
       type: "sms",
     });
-    if (error) setError(error.message);
-    else { router.push("/home"); router.refresh(); }
+    if (error) {
+      setError(error.message);
+    } else {
+      // تحديث last_active_at فوراً بعد الدخول
+      await supabase.rpc("touch_last_active");
+      router.push("/home");
+      router.refresh();
+    }
     setLoading(false);
   }
 
@@ -64,8 +70,14 @@ export default function LoginPage() {
     setError(null);
     const email = `${username.trim().toLowerCase()}@familytree.local`;
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError("اسم المستخدم أو كلمة السر غير صحيحة");
-    else { router.push("/home"); router.refresh(); }
+    if (error) {
+      setError("اسم المستخدم أو كلمة السر غير صحيحة");
+    } else {
+      // تحديث last_active_at فوراً بعد الدخول
+      await supabase.rpc("touch_last_active");
+      router.push("/home");
+      router.refresh();
+    }
     setLoading(false);
   }
 
