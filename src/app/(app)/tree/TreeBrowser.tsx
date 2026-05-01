@@ -319,16 +319,21 @@ function FocusedMemberCard({
 
   return (
     <div
-      className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden p-2.5"
-      style={{
-        background: `linear-gradient(135deg, ${roleColor}10, ${roleColor}03)`,
-      }}
+      className="bg-white rounded-2xl border-2 shadow-md overflow-hidden"
+      style={{ borderColor: `${roleColor}40` }}
     >
-      <div className="flex items-center gap-3">
+      {/* رأس البطاقة */}
+      <div
+        className="px-4 py-3 flex items-center gap-3"
+        style={{
+          background: `linear-gradient(135deg, ${roleColor}15, ${roleColor}05)`,
+          borderBottom: `1px solid ${roleColor}20`,
+        }}
+      >
         {/* الصورة */}
         <div className="relative flex-shrink-0">
           <div
-            className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-black text-white overflow-hidden shadow-md ring-2 ring-white"
+            className="w-20 h-20 rounded-2xl flex items-center justify-center text-3xl font-black text-white overflow-hidden shadow-lg ring-3 ring-white"
             style={{
               background: `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)`,
             }}
@@ -341,56 +346,36 @@ function FocusedMemberCard({
             )}
           </div>
           {member.is_deceased && (
-            <div className="absolute -bottom-0.5 -right-0.5 bg-[#6B7B8D] text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] shadow">
+            <div className="absolute -bottom-1 -right-1 bg-[#6B7B8D] text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md">
               🕊️
             </div>
           )}
         </div>
 
-        {/* المعلومات */}
+        {/* الاسم + شارات الدور والأب */}
         <div className="flex-1 min-w-0">
-          {/* صف ١: زر الأب + الاسم */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {father && (
-              <button
-                onClick={onFatherClick}
-                className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold transition hover:scale-105 flex-shrink-0"
-                style={{ background: `${roleColor}20`, color: roleColor }}
-              >
-                <span>↑</span>
-                <span>{father.first_name}</span>
-              </button>
-            )}
-            <h2 className="font-black text-[#0F172A] text-sm md:text-base leading-tight truncate">
-              {member.full_name}
-            </h2>
-          </div>
-
-          {/* صف ٢: شارات + إحصائيات */}
+          {father && (
+            <button
+              onClick={onFatherClick}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-black transition hover:scale-105 mb-1"
+              style={{ background: `${roleColor}25`, color: roleColor }}
+            >
+              <span>↑</span>
+              <span>ابن {father.first_name}</span>
+            </button>
+          )}
+          <h2 className="font-black text-[#0F172A] text-base md:text-lg leading-tight">
+            {member.full_name}
+          </h2>
           <div className="flex flex-wrap items-center gap-1 mt-1">
-            <Pill color={roleColor}>{roleAr(member.role)}</Pill>
-            <Pill color="#5438DC">👨‍👦 {childrenCount}</Pill>
-            <Pill color="#10B981">🌳 {totalDescendants}</Pill>
-            <Pill color="#F59E0B">📍 ج{generation + 1}</Pill>
-            {member.phone_number && (
-              <a
-                href={`tel:${member.phone_number}`}
-                dir="ltr"
-                className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#357DED]/15 text-[#357DED] hover:bg-[#357DED] hover:text-white transition"
-              >
-                📞 {formatPhone(member.phone_number)}
-              </a>
-            )}
-            {member.birth_date && (
-              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#F1F5F9] text-[#475569]">
-                🎂 {formatDate(member.birth_date)}
-              </span>
-            )}
+            <Pill color={roleColor}>⭐ {roleAr(member.role)}</Pill>
+            {member.is_deceased && <Pill color="#6B7B8D">🕊️ متوفى</Pill>}
+            <Pill color="#F59E0B">📍 الجيل {generation + 1}</Pill>
           </div>
         </div>
 
         {/* أزرار سريعة */}
-        <div className="flex flex-col gap-1 flex-shrink-0">
+        <div className="flex flex-col gap-1.5 flex-shrink-0">
           {canModerate && (
             <MemberFullEditClient
               key={member.id}
@@ -402,16 +387,86 @@ function FocusedMemberCard({
           {canModerate && (
             <Link
               href={`/admin/profiles/${member.id}`}
-              className="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] flex items-center justify-center text-sm hover:bg-[#357DED] hover:text-white hover:border-[#357DED] transition"
-              title="فتح الملف"
+              className="w-9 h-9 rounded-xl bg-white border border-[#E2E8F0] flex items-center justify-center text-base hover:bg-[#357DED] hover:text-white hover:border-[#357DED] transition shadow-sm"
+              title="فتح الملف الكامل"
             >
               📂
             </Link>
           )}
         </div>
       </div>
+
+      {/* البيانات مع المسميات */}
+      <div className="px-4 py-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <DataField label="الأبناء" icon="👨‍👦" value={String(childrenCount)} color="#5438DC" />
+        <DataField label="إجمالي الذرّية" icon="🌳" value={String(totalDescendants)} color="#10B981" />
+        {member.phone_number ? (
+          <DataField
+            label="الهاتف"
+            icon="📞"
+            value={formatPhone(member.phone_number)}
+            color="#357DED"
+            href={`tel:${member.phone_number}`}
+            dir="ltr"
+          />
+        ) : (
+          <DataField label="الهاتف" icon="📞" value="—" color="#94A3B8" muted />
+        )}
+        {member.birth_date ? (
+          <DataField label="الميلاد" icon="🎂" value={formatDate(member.birth_date)} color="#EC4899" />
+        ) : (
+          <DataField label="الميلاد" icon="🎂" value="—" color="#94A3B8" muted />
+        )}
+        {member.death_date && (
+          <DataField label="الوفاة" icon="🕊️" value={formatDate(member.death_date)} color="#6B7B8D" />
+        )}
+      </div>
     </div>
   );
+}
+
+// ═══════════ Data Field (label + value) ═══════════
+function DataField({
+  label,
+  icon,
+  value,
+  color,
+  href,
+  dir,
+  muted,
+}: {
+  label: string;
+  icon: string;
+  value: string;
+  color: string;
+  href?: string;
+  dir?: string;
+  muted?: boolean;
+}) {
+  const inner = (
+    <div
+      className={`rounded-lg p-2 transition ${
+        href ? "hover:scale-[1.02] cursor-pointer" : ""
+      }`}
+      style={{
+        background: muted ? "#F8FAFC" : `${color}10`,
+        border: `1px solid ${muted ? "#E2E8F0" : `${color}25`}`,
+      }}
+    >
+      <div className="flex items-center gap-1 text-[10px] font-bold mb-0.5" style={{ color: muted ? "#94A3B8" : color }}>
+        <span className="text-xs">{icon}</span>
+        <span>{label}</span>
+      </div>
+      <div
+        className={`text-sm font-black truncate ${muted ? "text-[#94A3B8]" : "text-[#0F172A]"}`}
+        dir={dir}
+      >
+        {value}
+      </div>
+    </div>
+  );
+
+  return href ? <a href={href}>{inner}</a> : inner;
 }
 
 // ═══════════ Pill ═══════════
