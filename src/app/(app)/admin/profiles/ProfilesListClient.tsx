@@ -448,7 +448,7 @@ export function ProfilesListClient({
         <StatCard icon="📁" value={counts.all}      label="إجمالي" color="#357DED" />
         <StatCard icon="✅" value={counts.living}   label="حسابات نشطة" color="#10B981" />
         <StatCard icon="💤" value={counts.inactive} label="غير نشط" color="#F59E0B" pulse={counts.inactive > 0} />
-        <StatCard icon="🕊️" value={counts.deceased} label="أرشيف" color="#6B7B8D" />
+        <StatCard icon="🕊️" value={counts.deceased} label="متوفون" color="#6B7B8D" />
         <StatCard icon="🔒" value={counts.frozen}   label="مجمّد" color="#EF4444" pulse={counts.frozen > 0} />
       </div>
 
@@ -505,7 +505,7 @@ export function ProfilesListClient({
             {counts.inactive > 0 && (
               <FilterChip active={statusFilter === "inactive"} onClick={() => setStatusFilter("inactive")} label="💤 غير نشط" count={counts.inactive} color="#F59E0B" />
             )}
-            <FilterChip active={statusFilter === "deceased"} onClick={() => setStatusFilter("deceased")} label="أرشيف"    count={counts.deceased} color="#6B7B8D" />
+            <FilterChip active={statusFilter === "deceased"} onClick={() => setStatusFilter("deceased")} label="🕊️ متوفى" count={counts.deceased} color="#6B7B8D" />
             {counts.frozen > 0 && (
               <FilterChip active={statusFilter === "frozen"} onClick={() => setStatusFilter("frozen")} label="🔒 مجمّد" count={counts.frozen} color="#EF4444" />
             )}
