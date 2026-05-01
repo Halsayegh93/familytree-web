@@ -61,7 +61,28 @@ export default function RegisterPage() {
     setLoading(true);
     setError(null);
 
-    const email = `${username.trim().toLowerCase()}@familytree.local`;
+    const cleanUsername = username.trim().toLowerCase();
+
+    // 1) تحقق من اسم المستخدم — لازم يكون متاح
+    const { data: existingUsername, error: checkErr } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("username", cleanUsername)
+      .maybeSingle();
+
+    if (checkErr && checkErr.code !== "PGRST116") {
+      setError("خطأ في التحقق من اسم المستخدم — حاول مرة أخرى");
+      setLoading(false);
+      return;
+    }
+
+    if (existingUsername) {
+      setError("اسم المستخدم مستخدم مسبقاً — اختر اسماً آخر");
+      setLoading(false);
+      return;
+    }
+
+    const email = `${cleanUsername}@familytree.local`;
 
     let userId: string;
 
@@ -96,24 +117,26 @@ export default function RegisterPage() {
       status: "pending",
     };
 
-    // محاولة update أولاً (لو trigger خلق الصف تلقائياً)
+    // 2) UPDATE أولاً — الـ trigger خلق الصف تلقائياً
     const { error: updateErr } = await supabase
       .from("profiles")
-      .update({ ...profileData, registration_platform: "web", username: username.trim().toLowerCase() })
+      .update({ ...profileData, registration_platform: "web", username: cleanUsername })
       .eq("id", userId);
 
-    // لو فشل الـ update أو ما عنده صلاحية، جرّب insert
     if (updateErr) {
-      const { error: insertErr } = await supabase
-        .from("profiles")
-        .insert({ id: userId, ...profileData, registration_platform: "web", username: username.trim().toLowerCase() });
-
-      if (insertErr) {
+      // فحص نوع الخطأ — اسم المستخدم مكرر
+      if (updateErr.code === "23505" || updateErr.message?.includes("username")) {
         await supabase.auth.signOut();
-        setError("خطأ في حفظ البيانات: " + insertErr.message);
+        setError("اسم المستخدم مستخدم مسبقاً — اختر اسماً آخر");
         setLoading(false);
         return;
       }
+
+      // غير ذلك → احذف حساب auth وارجع للمستخدم
+      await supabase.auth.signOut();
+      setError("خطأ في حفظ البيانات: " + updateErr.message);
+      setLoading(false);
+      return;
     }
 
     router.push("/pending");

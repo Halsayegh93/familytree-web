@@ -17,26 +17,35 @@ export default async function PendingMembersPage() {
 
   if (!MODERATOR_ROLES.includes(profile?.role ?? "")) redirect("/home");
 
-  const { data: members } = await supabase
+  // الأعضاء المعلقين
+  const { data: pendingMembers } = await supabase
     .from("profiles")
-    .select("id, first_name, full_name, phone_number, created_at, avatar_url")
+    .select("id, first_name, full_name, phone_number, created_at, avatar_url, registration_platform, username")
     .eq("role", "pending")
     .order("created_at", { ascending: false });
+
+  // أعضاء الشجرة (للمطابقة)
+  const { data: treeMembers } = await supabase
+    .from("profiles")
+    .select("id, full_name, father_id, phone_number")
+    .neq("role", "pending")
+    .order("full_name");
 
   return (
     <PageBackground theme="admin">
       <main className="max-w-4xl mx-auto p-6 space-y-4">
-      <PageHero
-        theme="admin"
-        title="⏳ طلبات الأعضاء"
-        subtitle={`${members?.length ?? 0} طلب في انتظار المراجعة`}
-      />
+        <PageHero
+          theme="admin"
+          title="⏳ طلبات الانضمام"
+          subtitle={`${pendingMembers?.length ?? 0} طلب في انتظار المراجعة`}
+        />
 
-      <PendingMembersClient
-        members={members ?? []}
-        canReject={["owner", "admin", "monitor"].includes(profile?.role ?? "")}
-      />
-    </main>
+        <PendingMembersClient
+          members={pendingMembers ?? []}
+          treeMembers={treeMembers ?? []}
+          canReject={["owner", "admin", "monitor"].includes(profile?.role ?? "")}
+        />
+      </main>
     </PageBackground>
   );
 }
