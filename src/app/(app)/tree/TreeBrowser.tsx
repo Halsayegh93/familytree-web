@@ -567,7 +567,7 @@ function NodeCard({
         </div>
         <div className="w-full min-w-0">
           <div
-            className={`font-black truncate ${compact ? "text-[10px]" : "text-[11px]"} ${
+            className={`font-black truncate ${compact ? "text-sm" : "text-base"} ${
               dimmed ? "text-[#94A3B8]" : "text-[#0F172A]"
             }`}
           >
