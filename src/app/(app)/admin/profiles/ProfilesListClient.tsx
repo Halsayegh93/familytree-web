@@ -125,6 +125,48 @@ function Avatar({ member, size = 40, radius = 12 }: { member: Member; size?: num
   );
 }
 
+// ─── Member Mini Card (شبكة خفيفة) ────────────────────────────────────────────
+function MemberMiniCard({ member }: { member: Member }) {
+  const isInactive = !member.is_deceased && member.status !== "frozen" && member.is_active !== true;
+  const dimmed = member.is_deceased || member.status === "frozen";
+
+  return (
+    <Link
+      href={`/admin/profiles/${member.id}`}
+      className="group bg-white rounded-xl border border-[#E2E8F0] hover:border-[#357DED] hover:shadow-sm transition p-2 text-center overflow-hidden"
+    >
+      <div className="relative inline-block">
+        <Avatar member={member} size={56} radius={14} />
+        {/* مؤشر الحالة */}
+        {member.is_deceased && (
+          <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[#6B7B8D] text-white text-[10px] flex items-center justify-center shadow">
+            🕊️
+          </span>
+        )}
+        {member.status === "frozen" && (
+          <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[#EF4444] text-white text-[10px] flex items-center justify-center shadow">
+            🔒
+          </span>
+        )}
+        {!member.is_deceased && member.status !== "frozen" && (
+          <span
+            className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${
+              isInactive ? "bg-[#EF4444]" : "bg-[#10B981]"
+            }`}
+          />
+        )}
+      </div>
+      <div
+        className={`mt-1.5 font-black text-xs leading-tight line-clamp-2 ${
+          dimmed ? "text-[#94A3B8]" : "text-[#0F172A]"
+        }`}
+      >
+        {member.full_name}
+      </div>
+    </Link>
+  );
+}
+
 // ─── Member File Row (compact list) ───────────────────────────────────────────
 function MemberFileRow({
   member,
@@ -223,6 +265,7 @@ export function ProfilesListClient({
 
   const [members, setMembers] = useState(initialMembers);
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<"list" | "grid">("list");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [branchFilter, setBranchFilter] = useState<string>("all"); // "all" أو branch_id
   const [sortMode, setSortMode] = useState<SortMode>("name");
@@ -365,7 +408,7 @@ export function ProfilesListClient({
         />
       )}
 
-      {/* === توولبار موحّد: بحث + ترتيب === */}
+      {/* === توولبار موحّد: بحث + ترتيب + عرض === */}
       <div className="bg-white rounded-2xl border border-[#E2E8F0] p-2 flex gap-2">
         <div className="flex-1 relative">
           <input
@@ -395,6 +438,28 @@ export function ProfilesListClient({
           <option value="branch">↓ بالفرع</option>
           <option value="activity">↓ نشاط</option>
         </select>
+
+        {/* تبديل العرض */}
+        <div className="flex bg-[#F1F5F9] rounded-xl p-0.5 flex-shrink-0">
+          <button
+            onClick={() => setView("list")}
+            className={`px-2.5 py-1.5 rounded-lg text-sm transition ${
+              view === "list" ? "bg-white text-[#357DED] shadow-sm" : "text-[#64748B]"
+            }`}
+            title="قائمة"
+          >
+            ☰
+          </button>
+          <button
+            onClick={() => setView("grid")}
+            className={`px-2.5 py-1.5 rounded-lg text-sm transition ${
+              view === "grid" ? "bg-white text-[#357DED] shadow-sm" : "text-[#64748B]"
+            }`}
+            title="شبكة"
+          >
+            ▦
+          </button>
+        </div>
       </div>
 
       {/* === فلاتر مدمجة (تعمل كإحصائيات) === */}
@@ -420,8 +485,8 @@ export function ProfilesListClient({
         </div>
       )}
 
-      {/* === القائمة الموحّدة === */}
-      {filtered.length > 0 && (
+      {/* === عرض القائمة === */}
+      {filtered.length > 0 && view === "list" && (
         <div className="bg-white rounded-2xl border border-[#E2E8F0] divide-y divide-[#F1F5F9] overflow-hidden">
           {visible.map((m) => (
             <MemberFileRow
@@ -431,6 +496,15 @@ export function ProfilesListClient({
               busy={busy === m.id}
               onToggle={openConfirm}
             />
+          ))}
+        </div>
+      )}
+
+      {/* === عرض الشبكة الخفيف === */}
+      {filtered.length > 0 && view === "grid" && (
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+          {visible.map((m) => (
+            <MemberMiniCard key={m.id} member={m} />
           ))}
         </div>
       )}
