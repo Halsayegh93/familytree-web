@@ -142,26 +142,28 @@ export default async function AdminProfileDetailPage({
   }
 
   // درجة اكتمال البيانات (CRM data quality score)
-  // للمتوفى: لا نطلب إكمال الملف — نعرضه دائماً 100% لإخفاء التنبيه
-  let completenessPercent = 100;
-  let missingFields: string[] = [];
-  if (!member.is_deceased) {
-    const fieldChecks = [
-      { key: "first_name", label: "الاسم الأول", value: member.first_name },
-      { key: "full_name", label: "الاسم الكامل", value: member.full_name },
-      { key: "phone_number", label: "رقم الهاتف", value: member.phone_number },
-      { key: "birth_date", label: "تاريخ الميلاد", value: member.birth_date },
-      { key: "gender", label: "الجنس", value: member.gender },
-      { key: "avatar_url", label: "الصورة", value: member.avatar_url },
-    ];
-    const filledCount = fieldChecks.filter(
-      (f) => f.value !== null && f.value !== "" && f.value !== undefined
-    ).length;
-    completenessPercent = Math.round((filledCount / fieldChecks.length) * 100);
-    missingFields = fieldChecks
-      .filter((f) => f.value === null || f.value === "" || f.value === undefined)
-      .map((f) => f.label);
-  }
+  // للمتوفى: نتحقق من تاريخ الوفاة فقط (نتجاهل الهاتف، الميلاد، الجنس، الصورة)
+  const fieldChecks = member.is_deceased
+    ? [
+        { key: "first_name", label: "الاسم الأول", value: member.first_name },
+        { key: "full_name", label: "الاسم الكامل", value: member.full_name },
+        { key: "death_date", label: "تاريخ الوفاة", value: member.death_date },
+      ]
+    : [
+        { key: "first_name", label: "الاسم الأول", value: member.first_name },
+        { key: "full_name", label: "الاسم الكامل", value: member.full_name },
+        { key: "phone_number", label: "رقم الهاتف", value: member.phone_number },
+        { key: "birth_date", label: "تاريخ الميلاد", value: member.birth_date },
+        { key: "gender", label: "الجنس", value: member.gender },
+        { key: "avatar_url", label: "الصورة", value: member.avatar_url },
+      ];
+  const filledCount = fieldChecks.filter(
+    (f) => f.value !== null && f.value !== "" && f.value !== undefined
+  ).length;
+  const completenessPercent = Math.round((filledCount / fieldChecks.length) * 100);
+  const missingFields = fieldChecks
+    .filter((f) => f.value === null || f.value === "" || f.value === undefined)
+    .map((f) => f.label);
 
   const canEdit = ["owner", "admin", "monitor"].includes(viewerProfile?.role ?? "");
   const canManageRoles = viewerProfile?.role === "owner";
