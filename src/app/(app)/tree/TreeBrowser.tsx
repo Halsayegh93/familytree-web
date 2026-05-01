@@ -551,8 +551,8 @@ function NodeCard({
     >
       <div className="flex flex-col items-center text-center gap-1">
         <div
-          className={`rounded-lg flex items-center justify-center text-white font-black overflow-hidden flex-shrink-0 transition-transform group-hover:scale-110 ${
-            compact ? "w-12 h-12 text-base" : "w-14 h-14 text-lg"
+          className={`rounded-xl flex items-center justify-center text-white font-black overflow-hidden flex-shrink-0 transition-transform group-hover:scale-110 ${
+            compact ? "w-16 h-16 text-xl" : "w-20 h-20 text-2xl"
           } ${dimmed ? "grayscale opacity-70" : ""}`}
           style={{
             background: `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)`,
