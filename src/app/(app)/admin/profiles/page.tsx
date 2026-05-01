@@ -6,6 +6,10 @@ import { ProfilesListClient } from "./ProfilesListClient";
 import { FollowUpDashboard } from "./FollowUpDashboard";
 import { MembersTabs } from "./MembersTabs";
 
+// لا تكاش — يجلب البيانات الحديثة في كل زيارة
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const MODERATOR_ROLES = ["owner", "admin", "monitor", "supervisor"];
 
 export default async function AdminProfilesPage() {
