@@ -523,7 +523,7 @@ function BranchPicker({
           🌳
         </div>
 
-        {/* الاسم + العدد */}
+        {/* الاسم + العدد (يظهر فقط للفرع المحدد) */}
         <div className="flex-1 min-w-0">
           <div className="text-[10px] font-bold text-[#94A3B8] mb-0.5">
             🌳 حصر الفروع — {branches.length} فرع
@@ -532,12 +532,14 @@ function BranchPicker({
             <span className="font-black text-sm text-[#0F172A] truncate">
               {selected.name}
             </span>
-            <span
-              className="px-2 py-0.5 rounded-full text-[10px] font-black flex-shrink-0"
-              style={{ background: selected.color, color: "white" }}
-            >
-              {selected.count}
-            </span>
+            {selectedId !== "all" && (
+              <span
+                className="px-2 py-0.5 rounded-full text-[10px] font-black flex-shrink-0"
+                style={{ background: selected.color, color: "white" }}
+              >
+                {selected.count}
+              </span>
+            )}
           </div>
         </div>
 
