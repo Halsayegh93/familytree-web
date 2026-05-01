@@ -356,32 +356,34 @@ function FocusedMemberCard({
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-black transition hover:scale-105 mb-1.5"
               style={{ background: `${roleColor}25`, color: roleColor }}
             >
+              <span className="opacity-80">الأب:</span>
               <span>↑</span>
-              <span>ابن {father.first_name}</span>
+              <span>{father.first_name}</span>
             </button>
           )}
           <h2 className="font-black text-[#0F172A] text-lg md:text-xl leading-tight">
             {member.full_name}
           </h2>
           <div className="flex flex-wrap items-center gap-1 mt-2">
-            <Pill color="#10B981">🌳 {totalDescendants} ذرّية</Pill>
+            <LabelPill label="الذرّية" icon="🌳" value={String(totalDescendants)} color="#10B981" />
             {member.is_deceased ? (
               member.death_date && (
-                <Pill color="#6B7B8D">🕊️ {formatDate(member.death_date)}</Pill>
+                <LabelPill label="الوفاة" icon="🕊️" value={formatDate(member.death_date)} color="#6B7B8D" />
               )
             ) : (
               <>
                 {member.phone_number && (
                   <a
                     href={`tel:${member.phone_number}`}
-                    dir="ltr"
                     className="inline-flex items-center gap-0.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[#357DED]/15 text-[#357DED] hover:bg-[#357DED] hover:text-white transition"
                   >
-                    📞 {formatPhone(member.phone_number)}
+                    <span className="opacity-80">الهاتف:</span>
+                    <span>📞</span>
+                    <span dir="ltr">{formatPhone(member.phone_number)}</span>
                   </a>
                 )}
                 {member.birth_date && (
-                  <Pill color="#EC4899">🎂 {formatDate(member.birth_date)}</Pill>
+                  <LabelPill label="الميلاد" icon="🎂" value={formatDate(member.birth_date)} color="#EC4899" />
                 )}
               </>
             )}
@@ -410,6 +412,30 @@ function FocusedMemberCard({
         </div>
       )}
     </div>
+  );
+}
+
+// ═══════════ Label Pill (مسمى + أيقونة + قيمة) ═══════════
+function LabelPill({
+  label,
+  icon,
+  value,
+  color,
+}: {
+  label: string;
+  icon: string;
+  value: string;
+  color: string;
+}) {
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 px-2.5 py-0.5 rounded-full text-[10px] font-black"
+      style={{ background: `${color}18`, color }}
+    >
+      <span className="opacity-80">{label}:</span>
+      <span>{icon}</span>
+      <span>{value}</span>
+    </span>
   );
 }
 
