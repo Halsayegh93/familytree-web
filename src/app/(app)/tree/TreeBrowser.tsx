@@ -553,7 +553,7 @@ function NodeCard({
       <div className="flex flex-col items-center text-center gap-1">
         <div
           className={`rounded-lg flex items-center justify-center text-white font-black overflow-hidden flex-shrink-0 transition-transform group-hover:scale-110 ${
-            compact ? "w-9 h-9 text-sm" : "w-10 h-10 text-base"
+            compact ? "w-12 h-12 text-base" : "w-14 h-14 text-lg"
           } ${dimmed ? "grayscale opacity-70" : ""}`}
           style={{
             background: `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)`,
