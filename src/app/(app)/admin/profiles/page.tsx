@@ -72,11 +72,14 @@ export default async function AdminProfilesPage() {
     });
     if (activity) {
       activityMap = (activity as any[]).reduce((acc, row) => {
-        // الأقرب من sign_in أو session أو device — أيهما أحدث
-        const latest = [row.last_sign_in_at, row.last_session_at, row.last_device_active]
-          .filter(Boolean)
-          .sort()
-          .reverse()[0] ?? null;
+        // الأحدث من جميع الإشارات (دخول/جلسة/جهاز/فعل بالتطبيق)
+        const candidates = [
+          row.last_sign_in_at,
+          row.last_session_at,
+          row.last_device_active,
+          row.last_action_at,
+        ].filter((d) => d && new Date(d).getFullYear() > 2000);
+        const latest = candidates.sort().reverse()[0] ?? null;
         acc[row.member_id] = {
           is_active: row.is_active,
           days_since_active: row.days_since_active,
