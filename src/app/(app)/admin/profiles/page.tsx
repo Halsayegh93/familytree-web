@@ -68,35 +68,18 @@ export default async function AdminProfilesPage() {
     };
   });
 
-  // جلب حالة النشاط للأعضاء (last_sign_in_at من auth)
+  // جلب حالة النشاط للأعضاء (آخر فعل + جهاز نشط)
   let activityMap: Record<string, { is_active: boolean; days_since_active: number | null; last_sign_in_at: string | null }> = {};
-  let debugInfo = "";
   if (members && members.length > 0) {
-    const { data: activity, error: activityErr } = await supabase.rpc("get_members_activity", {
+    const { data: activity } = await supabase.rpc("get_members_activity", {
       member_ids: members.map((m: any) => m.id),
     });
 
-    if (activityErr) {
-      debugInfo = `RPC ERROR: ${activityErr.message} | code: ${activityErr.code} | hint: ${activityErr.hint ?? "—"}`;
-    } else if (!Array.isArray(activity)) {
-      debugInfo = `RPC returned non-array: ${typeof activity}`;
-    } else {
-      const activeCount = activity.filter((r: any) => r.is_active).length;
-      const sample = activity[0]
-        ? `sample[0]: is_active=${activity[0].is_active}, last_active_at=${activity[0].last_active_at}, last_sign_in=${activity[0].last_sign_in_at}, last_session=${activity[0].last_session_at}`
-        : "no rows";
-      debugInfo = `RPC OK: ${activity.length} rows, ${activeCount} active. ${sample}`;
-    }
-
     if (activity) {
       activityMap = (activity as any[]).reduce((acc, row) => {
-        // الأحدث من جميع الإشارات (دخول/جلسة/جهاز/فعل بالتطبيق)
-        const candidates = [
-          row.last_sign_in_at,
-          row.last_session_at,
-          row.last_device_active,
-          row.last_action_at,
-        ].filter((d) => d && new Date(d).getFullYear() > 2000);
+        // الأحدث من last_active_at (موقع/تطبيق) أو last_device_active
+        const candidates = [row.last_active_at, row.last_device_active]
+          .filter((d) => d && new Date(d).getFullYear() > 2000);
         const latest = candidates.sort().reverse()[0] ?? null;
         acc[row.member_id] = {
           is_active: row.is_active,
@@ -181,13 +164,6 @@ export default async function AdminProfilesPage() {
           subtitle={`${members?.length ?? 0} عضو في النظام`}
           badge={isHR ? { label: "🔒 لجنة", private: true } : undefined}
         />
-
-        {/* Debug — مؤقت */}
-        {debugInfo && (
-          <div className="bg-yellow-50 border border-yellow-300 rounded-xl p-3 text-xs font-mono text-yellow-900 break-all">
-            🐛 {debugInfo}
-          </div>
-        )}
 
         <MembersTabs
           showFollowUp={isHR}
