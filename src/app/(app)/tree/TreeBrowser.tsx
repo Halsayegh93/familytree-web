@@ -435,12 +435,11 @@ function FocusedMemberCard({
                     className="inline-flex items-center gap-0.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[#357DED]/15 text-[#357DED] hover:bg-[#357DED] hover:text-white transition"
                   >
                     <span className="opacity-80">الهاتف:</span>
-                    <span>📞</span>
                     <span dir="ltr">{formatPhone(member.phone_number)}</span>
                   </a>
                 )}
                 {member.birth_date && (
-                  <LabelPill label="الميلاد" icon="🎂" value={formatDate(member.birth_date)} color="#EC4899" />
+                  <LabelPill label="الميلاد" value={formatDate(member.birth_date)} color="#EC4899" />
                 )}
               </>
             )}
