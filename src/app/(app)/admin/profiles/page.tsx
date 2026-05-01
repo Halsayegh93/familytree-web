@@ -67,9 +67,22 @@ export default async function AdminProfilesPage() {
   // جلب حالة النشاط للأعضاء (last_sign_in_at من auth)
   let activityMap: Record<string, { is_active: boolean; days_since_active: number | null; last_sign_in_at: string | null }> = {};
   if (members && members.length > 0) {
-    const { data: activity } = await supabase.rpc("get_members_activity", {
+    const { data: activity, error: activityErr } = await supabase.rpc("get_members_activity", {
       member_ids: members.map((m: any) => m.id),
     });
+
+    if (activityErr) {
+      console.error("[get_members_activity] RPC error:", activityErr);
+    } else {
+      console.log(
+        "[get_members_activity] success:",
+        Array.isArray(activity) ? activity.length : 0,
+        "rows;",
+        Array.isArray(activity) ? activity.filter((r: any) => r.is_active).length : 0,
+        "active"
+      );
+    }
+
     if (activity) {
       activityMap = (activity as any[]).reduce((acc, row) => {
         // الأحدث من جميع الإشارات (دخول/جلسة/جهاز/فعل بالتطبيق)
