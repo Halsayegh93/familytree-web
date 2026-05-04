@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { isWebPushSupported, subscribeToPush } from "@/lib/web-push";
 
 /**
  * ActivityTracker — يبلّغ القاعدة بمكان وجود العضو في الموقع
@@ -44,6 +45,22 @@ export function ActivityTracker() {
     };
     void registerSession();
 
+    // تفعيل تلقائي لإشعارات المتصفح (يطلب الإذن أول مرة)
+    const autoEnablePush = async () => {
+      if (!isWebPushSupported()) return;
+      const perm = Notification.permission;
+      if (perm === "denied") return; // المستخدم رفض سابقاً
+      // permission === "granted" → يعيد التسجيل (لو الـ subscription انتهى)
+      // permission === "default" → يطلب الإذن
+      try {
+        await subscribeToPush();
+      } catch (e) {
+        // silent
+      }
+    };
+    // تأخير بسيطة عشان لا نطلب الإذن لحظة فتح الصفحة (سياسة المتصفحات)
+    const timer = setTimeout(() => void autoEnablePush(), 1500);
+
     // throttle: لا ترسل نفس الشاشة أكثر من مرة كل 30 ثانية
     const same = lastReported.current.screen === screen;
     const recent = Date.now() - lastReported.current.at < 30_000;
@@ -56,7 +73,10 @@ export function ActivityTracker() {
       void report();
     }, 60_000);
 
-    return () => clearInterval(heartbeat);
+    return () => {
+      clearInterval(heartbeat);
+      clearTimeout(timer);
+    };
   }, [pathname, supabase]);
 
   return null;
