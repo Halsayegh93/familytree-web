@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
+import { ActivityTracker } from "@/components/ActivityTracker";
 import { getProfileId } from "@/lib/get-profile-id";
 
 // تأكد أن كل صفحة في (app) ديناميكية لتحديث last_active_at مع كل زيارة
@@ -40,6 +41,7 @@ export default async function AppLayout({
   return (
     <>
       <AppHeader canModerate={canModerate} isHR={isHR} />
+      <ActivityTracker />
       <div className="flex-1">{children}</div>
     </>
   );
