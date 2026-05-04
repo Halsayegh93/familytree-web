@@ -32,6 +32,18 @@ export function ActivityTracker() {
       }
     };
 
+    // سجل جلسة الموقع مرة واحدة (يميّز web users من app users)
+    const registerSession = async () => {
+      try {
+        await supabase.rpc("register_web_session", {
+          p_user_agent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
+        });
+      } catch (e) {
+        // silent — مو ضروري نظهر خطأ للمستخدم
+      }
+    };
+    void registerSession();
+
     // throttle: لا ترسل نفس الشاشة أكثر من مرة كل 30 ثانية
     const same = lastReported.current.screen === screen;
     const recent = Date.now() - lastReported.current.at < 30_000;
