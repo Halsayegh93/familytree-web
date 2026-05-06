@@ -327,8 +327,8 @@ export function ProfilesListClient({
       const q = search.toLowerCase();
       result = result.filter(
         (m) =>
-          m.full_name.toLowerCase().includes(q) ||
-          m.first_name.toLowerCase().includes(q) ||
+          (m.full_name ?? "").toLowerCase().includes(q) ||
+          (m.first_name ?? "").toLowerCase().includes(q) ||
           (m.phone_number ?? "").includes(q)
       );
     }
@@ -352,10 +352,10 @@ export function ProfilesListClient({
         const bb = b.branch_name ?? "";
         const cmp = ab.localeCompare(bb, "ar");
         if (cmp !== 0) return cmp;
-        return a.full_name.localeCompare(b.full_name, "ar");
+        return (a.full_name ?? "").localeCompare(b.full_name ?? "", "ar");
       });
     } else {
-      result.sort((a, b) => a.full_name.localeCompare(b.full_name, "ar"));
+      result.sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? "", "ar"));
     }
 
     return result;
