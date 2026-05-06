@@ -153,44 +153,48 @@ export default async function AdminDashboard() {
       </Section>
 
       {isOwner && (
-        <Section title="إعدادات النظام" icon="⚙️" color="#5438DC">
-          <ActionRow
-            href="/admin/settings"
-            icon="⚙️"
-            title="إعدادات التطبيق"
-            subtitle="التسجيل · الأخبار · الميزات"
-            color="#357DED"
-          />
-          <ActionRow
-            href="/admin/system-health"
-            icon="💚"
-            title="صحة النظام"
-            subtitle="النشاط · الأجهزة · الإشعارات"
-            color="#10B981"
-          />
-          <ActionRow
-            href="/admin/devices"
-            icon="📱"
-            title="إدارة الأجهزة"
-            subtitle="عرض وإزالة أجهزة الأعضاء"
-            color="#3B82F6"
-          />
-          <ActionRow
-            href="/admin/banned"
-            icon="🚫"
-            title="الأرقام المحظورة"
-            subtitle="حظر أرقام من الدخول"
-            badge={bannedPhones ?? 0}
-            color="#EF4444"
-          />
-          <ActionRow
-            href="/admin/moderators"
-            icon="⭐"
-            title="إدارة الأدوار"
-            subtitle="تعيين المدراء والمشرفين"
-            color="#F59E0B"
-          />
-        </Section>
+        <>
+          <Section title="الإعدادات العامة" icon="⚙️" color="#357DED">
+            <ActionRow
+              href="/admin/settings"
+              icon="⚙️"
+              title="إعدادات التطبيق"
+              subtitle="التسجيل · الأخبار · الميزات · الصيانة"
+              color="#357DED"
+            />
+          </Section>
+
+          <Section title="الفريق" icon="👥" color="#5438DC">
+            <ActionRow
+              href="/admin/moderators"
+              icon="⭐"
+              title="المدراء والمشرفون"
+              subtitle="تعيين الأدوار وإدارة الصلاحيات"
+              color="#5438DC"
+            />
+          </Section>
+
+          <Section title="الأمان" icon="🔒" color="#EF4444">
+            <ActionRow
+              href="/admin/banned"
+              icon="🚫"
+              title="الأرقام المحظورة"
+              subtitle="منع أرقام معينة من التسجيل"
+              badge={bannedPhones ?? 0}
+              color="#EF4444"
+            />
+          </Section>
+
+          <Section title="المراقبة" icon="💚" color="#10B981">
+            <ActionRow
+              href="/admin/system-health"
+              icon="📊"
+              title="صحة النظام"
+              subtitle="النشاط · الأجهزة · الإشعارات"
+              color="#10B981"
+            />
+          </Section>
+        </>
       )}
     </main>
     </PageBackground>
