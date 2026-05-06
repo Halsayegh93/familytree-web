@@ -20,32 +20,27 @@ export default async function NotificationsPage() {
 
   const canModerate = MODERATOR_ROLES.includes(profile?.role ?? "");
 
-  const { data: notifications } = await supabase
+  // للمدراء: نجلب الإشعارات الموجهة + broadcast (target_member_id IS NULL)
+  // لغير المدراء: فقط الإشعارات الموجهة
+  let query = supabase
     .from("notifications")
-    .select("id, title, body, kind, created_at, is_read, created_by, target_member_id")
-    .eq("target_member_id", userId)
+    .select("id, title, body, kind, created_at, is_read, created_by, target_member_id, request_id, request_type")
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(300);
+
+  if (canModerate) {
+    query = query.or(`target_member_id.eq.${userId},target_member_id.is.null`);
+  } else {
+    query = query.eq("target_member_id", userId);
+  }
+
+  const { data: notifications } = await query;
 
   return (
-    <main className="max-w-3xl mx-auto p-4 md:p-6 space-y-4">
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 flex items-center gap-3">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#357DED] to-[#5438DC] flex items-center justify-center text-2xl">
-          🔔
-        </div>
-        <div className="flex-1">
-          <h1 className="font-black text-xl text-[#0F172A]">الإشعارات</h1>
-          <p className="text-sm text-[#64748B]">
-            {notifications?.length ?? 0} إشعار
-          </p>
-        </div>
-      </div>
-
-      <NotificationsClient
-        initialNotifications={notifications ?? []}
-        userId={userId}
-        canModerate={canModerate}
-      />
-    </main>
+    <NotificationsClient
+      initialNotifications={notifications ?? []}
+      userId={userId}
+      canModerate={canModerate}
+    />
   );
 }
