@@ -56,6 +56,7 @@ const META: Record<string, Omit<NotificationKindMeta, "href">> = {
   admin_edit_avatar:        { icon: "📷", color: "#06B6D4", labelAr: "تعديل الصورة" },
   admin_edit_avatar_remove: { icon: "❌", color: "#EF4444", labelAr: "حذف الصورة" },
   admin_edit_child_add:     { icon: "➕", color: "#10B981", labelAr: "إضافة ابن" },
+  admin_child_add:          { icon: "➕", color: "#10B981", labelAr: "إضافة ابن" }, // legacy
   admin_edit_child_remove:  { icon: "➖", color: "#EF4444", labelAr: "حذف ابن" },
   member_add:               { icon: "🪪", color: "#10B981", labelAr: "إضافة عضو" },
   member_delete:            { icon: "🚫", color: "#EF4444", labelAr: "حذف عضو" },
@@ -73,7 +74,7 @@ export const ACTIVITY_KINDS = new Set<string>([
   "admin_edit", "admin_edit_name", "admin_edit_dates", "admin_edit_phone",
   "admin_edit_role", "admin_edit_father", "admin_edit_avatar", "admin_edit_avatar_remove",
   "admin_edit_phone_remove",
-  "admin_edit_child_add", "admin_edit_child_remove",
+  "admin_edit_child_add", "admin_edit_child_remove", "admin_child_add",
   "member_add", "member_delete",
   "account_activated", "news_published", "news_delete", "role_change",
 ]);
