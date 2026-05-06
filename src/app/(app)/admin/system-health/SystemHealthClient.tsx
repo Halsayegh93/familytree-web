@@ -276,21 +276,29 @@ function DevicesPanel({ devices, webSessions }: { devices: Device[]; webSessions
   const iosCount = devices.length;
   const sandbox = devices.filter(d => d.environment === "sandbox").length;
   const production = devices.filter(d => d.environment === "production").length;
+  const total = iosCount + webSessions.length;
 
   return (
     <div className="space-y-4">
-      {/* Devices stats */}
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4">
-        <h3 className="font-black text-sm text-[#0F172A] mb-3">📱 أجهزة iOS</h3>
-        <div className="grid grid-cols-3 gap-2">
-          <MiniStat label="إجمالي" value={iosCount} color="#357DED" />
+      {/* Unified stats — كل الإحصائيات في مكان واحد */}
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-base">📊</span>
+          <span className="font-black text-sm text-[#0F172A]">الإجمالي</span>
+          <span className="text-xs px-2 py-0.5 rounded-full font-black bg-[#357DED]/15 text-[#357DED] mr-auto">
+            {total}
+          </span>
+        </div>
+        <div className="grid grid-cols-4 gap-2">
+          <MiniStat label="iOS" value={iosCount} color="#357DED" />
+          <MiniStat label="Web" value={webSessions.length} color="#5438DC" />
           <MiniStat label="Production" value={production} color="#10B981" />
           <MiniStat label="Sandbox" value={sandbox} color="#F59E0B" />
         </div>
       </div>
 
       {/* iOS devices list */}
-      <Card title="أجهزة iOS مسجلة" subtitle={`${devices.length}`} icon="🍎" color="#357DED">
+      <Card title="أجهزة iOS" subtitle={`${devices.length}`} icon="🍎" color="#357DED">
         {devices.length === 0
           ? <Empty text="لا يوجد أجهزة مسجلة" emoji="📵" />
           : <div className="divide-y divide-[#F1F5F9] max-h-[500px] overflow-y-auto">
@@ -309,14 +317,6 @@ function DevicesPanel({ devices, webSessions }: { devices: Device[]; webSessions
               ))}
             </div>}
       </Card>
-
-      {/* Web sessions stats */}
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4">
-        <h3 className="font-black text-sm text-[#0F172A] mb-3">🌐 جلسات الموقع</h3>
-        <div className="grid grid-cols-1 gap-2">
-          <MiniStat label="إجمالي" value={webSessions.length} color="#5438DC" />
-        </div>
-      </div>
 
       {/* Web sessions list */}
       <Card title="جلسات الموقع" subtitle={`${webSessions.length}`} icon="🌐" color="#5438DC">
@@ -342,27 +342,29 @@ function DevicesPanel({ devices, webSessions }: { devices: Device[]; webSessions
 // ─── PUSH PANEL ───────────────────────────────────────────────────
 function PushPanel({ devices, webPushSubs }: { devices: Device[]; webPushSubs: WebPushSub[] }) {
   const totalReceivers = devices.length + webPushSubs.length;
+  const production = devices.filter(d => d.environment === "production").length;
+  const sandbox = devices.filter(d => d.environment === "sandbox").length;
+
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4">
-        <h3 className="font-black text-sm text-[#0F172A] mb-3">📨 إجمالي المستلمين</h3>
-        <div className="grid grid-cols-3 gap-2">
-          <MiniStat label="الكل" value={totalReceivers} color="#5438DC" />
+      {/* Unified stats — كل الإحصائيات في مكان واحد */}
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-base">📨</span>
+          <span className="font-black text-sm text-[#0F172A]">المستلمون</span>
+          <span className="text-xs px-2 py-0.5 rounded-full font-black bg-[#5438DC]/15 text-[#5438DC] mr-auto">
+            {totalReceivers}
+          </span>
+        </div>
+        <div className="grid grid-cols-4 gap-2">
           <MiniStat label="iOS" value={devices.length} color="#357DED" />
           <MiniStat label="Web" value={webPushSubs.length} color="#10B981" />
+          <MiniStat label="Production" value={production} color="#059669" />
+          <MiniStat label="Sandbox" value={sandbox} color="#F59E0B" />
         </div>
       </div>
 
-      <Card title="نظرة عامة" icon="📊" color="#5438DC">
-        <div className="p-4 space-y-3">
-          <InfoRow label="iOS Push (APNs)" value={`${devices.length} جهاز`} />
-          <SubRow label="Production" value={`${devices.filter(d => d.environment === "production").length}`} />
-          <SubRow label="Sandbox (TestFlight)" value={`${devices.filter(d => d.environment === "sandbox").length}`} />
-          <div className="border-t border-[#E2E8F0] my-2" />
-          <InfoRow label="Web Push (VAPID)" value={`${webPushSubs.length} اشتراك`} />
-        </div>
-      </Card>
-
+      {/* Web push subscriptions list */}
       <Card title="اشتراكات Web Push" subtitle={`${webPushSubs.length}`} icon="🌐" color="#10B981">
         {webPushSubs.length === 0
           ? <Empty text="لا يوجد اشتراكات web push" emoji="🔕" />
