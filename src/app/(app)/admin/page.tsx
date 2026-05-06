@@ -13,11 +13,21 @@ export default async function AdminDashboard() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from("profiles")
     .select("role, is_hr_member")
     .eq("id", getProfileId(user)!)
     .single();
+
+  // Resilient fallback: if is_hr_member column doesn't exist yet, retry without it
+  if (!profile) {
+    const { data: fallback } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", getProfileId(user)!)
+      .single();
+    profile = fallback as any;
+  }
 
   if (!MODERATOR_ROLES.includes(profile?.role ?? "")) {
     redirect("/home");

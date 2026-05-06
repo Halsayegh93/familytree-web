@@ -17,11 +17,21 @@ export default async function AdminProfileDetailPage({
   const { id } = await params;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: viewerProfile } = await supabase
+  let { data: viewerProfile } = await supabase
     .from("profiles")
     .select("role, is_hr_member")
     .eq("id", getProfileId(user)!)
     .single();
+
+  // Resilient fallback: if is_hr_member column doesn't exist yet, retry without it
+  if (!viewerProfile) {
+    const { data: fallback } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", getProfileId(user)!)
+      .single();
+    viewerProfile = fallback as any;
+  }
 
   const isHR = viewerProfile?.is_hr_member === true;
   const canEditAdmin = ["owner", "admin", "monitor", "supervisor"].includes(viewerProfile?.role ?? "");

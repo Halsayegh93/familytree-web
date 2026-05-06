@@ -15,11 +15,21 @@ const MODERATOR_ROLES = ["owner", "admin", "monitor", "supervisor"];
 export default async function AdminProfilesPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from("profiles")
     .select("role, is_hr_member")
     .eq("id", getProfileId(user)!)
     .single();
+
+  // Resilient fallback: if is_hr_member column doesn't exist yet, retry without it
+  if (!profile) {
+    const { data: fallback } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", getProfileId(user)!)
+      .single();
+    profile = fallback as any;
+  }
 
   const isHR = profile?.is_hr_member === true;
   const canModerate = MODERATOR_ROLES.includes(profile?.role ?? "");
@@ -109,9 +119,9 @@ export default async function AdminProfilesPage() {
       { data: contactRaw },
       { data: docsRaw },
     ] = await Promise.all([
-      supabase.from("hr_notes").select("member_id, status, created_at"),
-      supabase.from("hr_contact_log").select("member_id, status, contacted_at"),
-      supabase.from("hr_documents").select("member_id, status, created_at"),
+      supabase.from("hr_notes").select("member_id, created_at"),
+      supabase.from("hr_contact_log").select("member_id, contacted_at"),
+      supabase.from("hr_documents").select("member_id, created_at"),
     ]);
 
     const latestStatusByMember = new Map<string, { status: string; date: string }>();
@@ -122,9 +132,9 @@ export default async function AdminProfilesPage() {
         latestStatusByMember.set(memberId, { status, date });
       }
     }
-    notesRaw?.forEach((n: any) => record(n.member_id, n.status, n.created_at));
-    contactRaw?.forEach((c: any) => record(c.member_id, c.status, c.contacted_at));
-    docsRaw?.forEach((d: any) => record(d.member_id, d.status, d.created_at));
+    notesRaw?.forEach((n: any) => record(n.member_id, null, n.created_at));
+    contactRaw?.forEach((c: any) => record(c.member_id, null, c.contacted_at));
+    docsRaw?.forEach((d: any) => record(d.member_id, null, d.created_at));
 
     const trackedIds = Array.from(latestStatusByMember.keys());
 

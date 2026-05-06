@@ -23,11 +23,22 @@ export default async function AppLayout({
 
   const profileId = getProfileId(user);
 
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from("profiles")
     .select("role, status, is_hr_member")
     .eq("id", profileId!)
     .single();
+
+  // Resilient fallback: if is_hr_member column doesn't exist yet (migration pending),
+  // retry without it so admin access still works.
+  if (!profile) {
+    const { data: fallback } = await supabase
+      .from("profiles")
+      .select("role, status")
+      .eq("id", profileId!)
+      .single();
+    profile = fallback as any;
+  }
 
   // عضو معلق — وجّهه لصفحة الانتظار
   if (profile?.status === "pending") redirect("/pending");
