@@ -8,16 +8,18 @@ import Link from "next/link";
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
-  const [tab, setTab] = useState<"phone" | "password">("phone");
+  const [tab, setTab] = useState<"phone" | "username">("phone");
 
   // Phone OTP
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [otpStep, setOtpStep] = useState<"phone" | "otp">("phone");
 
-  // Username/Password
+  // Username → Phone lookup → OTP
   const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [usernameStep, setUsernameStep] = useState<"username" | "otp">("username");
+  const [resolvedPhone, setResolvedPhone] = useState<string | null>(null);
+  const [usernameOtp, setUsernameOtp] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +33,7 @@ export default function LoginPage() {
 
   const cleanPhone = normalizeDigits(phone);
 
+  // ─── Phone OTP flow ────────────────────────────────────────────
   async function sendOtp(e: React.FormEvent) {
     e.preventDefault();
     if (cleanPhone.length < 7) return;
@@ -55,7 +58,6 @@ export default function LoginPage() {
     if (error) {
       setError(error.message);
     } else {
-      // تحديث last_active_at فوراً بعد الدخول
       await supabase.rpc("touch_last_active");
       router.push("/home");
       router.refresh();
@@ -63,22 +65,74 @@ export default function LoginPage() {
     setLoading(false);
   }
 
-  async function loginWithPassword(e: React.FormEvent) {
+  // ─── Username → Phone OTP flow ─────────────────────────────────
+  async function lookupUsername(e: React.FormEvent) {
     e.preventDefault();
-    if (!username.trim() || !password) return;
+    if (!username.trim()) return;
     setLoading(true);
     setError(null);
-    const email = `${username.trim().toLowerCase()}@familytree.local`;
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("phone_number, username")
+      .eq("username", username.trim().toLowerCase())
+      .maybeSingle();
+
+    if (!profile) {
+      setError("اسم المستخدم غير موجود — سجّل دخولك برقم هاتفك");
+      setLoading(false);
+      return;
+    }
+
+    if (!profile.phone_number) {
+      setError("هذا الحساب ليس له رقم هاتف — تواصل مع الإدارة");
+      setLoading(false);
+      return;
+    }
+
+    const { error: otpError } = await supabase.auth.signInWithOtp({ phone: profile.phone_number });
+    if (otpError) {
+      setError("خطأ في إرسال الرمز — " + otpError.message);
+      setLoading(false);
+      return;
+    }
+
+    setResolvedPhone(profile.phone_number);
+    setUsernameStep("otp");
+    setLoading(false);
+  }
+
+  async function verifyUsernameOtp(e: React.FormEvent) {
+    e.preventDefault();
+    if (usernameOtp.length !== 6 || !resolvedPhone) return;
+    setLoading(true);
+    setError(null);
+
+    const { error } = await supabase.auth.verifyOtp({
+      phone: resolvedPhone,
+      token: usernameOtp,
+      type: "sms",
+    });
     if (error) {
-      setError("اسم المستخدم أو كلمة السر غير صحيحة");
+      setError(error.message);
     } else {
-      // تحديث last_active_at فوراً بعد الدخول
       await supabase.rpc("touch_last_active");
       router.push("/home");
       router.refresh();
     }
     setLoading(false);
+  }
+
+  // مسح الأخطاء عند تبديل التاب
+  function switchTab(t: "phone" | "username") {
+    setTab(t);
+    setError(null);
+  }
+
+  // عرض آخر 4 أرقام من الهاتف (للخصوصية)
+  function maskedPhone(p: string) {
+    const digits = p.replace(/\D/g, "");
+    return `**** ${digits.slice(-4)}`;
   }
 
   return (
@@ -95,11 +149,11 @@ export default function LoginPage() {
 
         {/* تابات */}
         <div className="bg-[#F1F5F9] rounded-xl p-1 flex gap-1">
-          <TabBtn active={tab === "phone"} onClick={() => { setTab("phone"); setError(null); }} icon="📱" label="رقم الهاتف" />
-          <TabBtn active={tab === "password"} onClick={() => { setTab("password"); setError(null); }} icon="👤" label="اسم مستخدم" />
+          <TabBtn active={tab === "phone"} onClick={() => switchTab("phone")} icon="📱" label="رقم الهاتف" />
+          <TabBtn active={tab === "username"} onClick={() => switchTab("username")} icon="👤" label="اسم مستخدم" />
         </div>
 
-        {/* تاب الهاتف */}
+        {/* ─── تاب الهاتف ─────────────────────────────────────────── */}
         {tab === "phone" && (
           otpStep === "phone" ? (
             <form onSubmit={sendOtp} className="space-y-3">
@@ -159,52 +213,77 @@ export default function LoginPage() {
           )
         )}
 
-        {/* تاب اسم المستخدم */}
-        {tab === "password" && (
-          <form onSubmit={loginWithPassword} className="space-y-3">
-            <div>
-              <label className="block text-xs font-bold text-[#475569] mb-1.5">اسم المستخدم</label>
+        {/* ─── تاب اسم المستخدم ────────────────────────────────────── */}
+        {tab === "username" && (
+          usernameStep === "username" ? (
+            <form onSubmit={lookupUsername} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-[#475569] mb-1.5">اسم المستخدم</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="username"
+                  className="w-full px-4 py-3 bg-[#F1F5F9] rounded-2xl text-base font-bold outline-none focus:ring-2 focus:ring-[#357DED]"
+                  dir="ltr"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading || !username.trim()}
+                className="w-full bg-gradient-to-r from-[#357DED] to-[#10B981] text-white py-4 rounded-2xl font-bold text-base shadow-lg disabled:opacity-50 active:scale-95 transition"
+              >
+                {loading ? "⏳ جاري البحث..." : "تسجيل الدخول ←"}
+              </button>
+
+              <div className="flex items-center justify-between pt-1">
+                <Link href="/register" className="text-sm font-bold text-[#357DED] hover:underline">
+                  تسجيل جديد
+                </Link>
+                <Link href="/reset-password" className="text-sm text-[#94A3B8] hover:text-[#357DED] font-semibold">
+                  ما عندك اسم مستخدم؟
+                </Link>
+              </div>
+            </form>
+          ) : (
+            /* بعد العثور على الهاتف — إرسال OTP */
+            <form onSubmit={verifyUsernameOtp} className="space-y-3">
+              <div className="p-3 bg-[#EBF3FE] rounded-xl text-center">
+                <p className="text-xs text-[#475569] font-semibold">تم إرسال رمز التحقق إلى</p>
+                <p className="text-base font-black text-[#357DED] mt-0.5" dir="ltr">
+                  {maskedPhone(resolvedPhone!)}
+                </p>
+              </div>
               <input
                 type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="username"
-                className="w-full px-4 py-3 bg-[#F1F5F9] rounded-2xl text-base font-bold outline-none focus:ring-2 focus:ring-[#357DED]"
-                dir="ltr"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="------"
+                value={usernameOtp}
+                onChange={(e) => setUsernameOtp(normalizeDigits(e.target.value).slice(0, 6))}
+                className="w-full px-4 py-4 bg-[#F1F5F9] rounded-2xl text-3xl font-black text-center tracking-widest outline-none focus:ring-2 focus:ring-[#357DED]"
                 autoFocus
                 required
               />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[#475569] mb-1.5">كلمة السر</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-4 py-3 bg-[#F1F5F9] rounded-2xl text-base font-bold outline-none focus:ring-2 focus:ring-[#357DED]"
-                dir="ltr"
-                required
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading || !username.trim() || !password}
-              className="w-full bg-gradient-to-r from-[#357DED] to-[#10B981] text-white py-4 rounded-2xl font-bold text-base shadow-lg disabled:opacity-50 active:scale-95 transition"
-            >
-              {loading ? "⏳ جاري الدخول..." : "دخول 🔓"}
-            </button>
-
-            {/* روابط */}
-            <div className="flex items-center justify-between pt-1">
-              <Link href="/register" className="text-sm font-bold text-[#357DED] hover:underline">
-                تسجيل جديد
-              </Link>
-              <Link href="/reset-password" className="text-sm text-[#94A3B8] hover:text-[#357DED] font-semibold">
-                نسيت كلمة السر؟
-              </Link>
-            </div>
-          </form>
+              <button
+                type="submit"
+                disabled={loading || usernameOtp.length !== 6}
+                className="w-full bg-gradient-to-r from-[#357DED] to-[#10B981] text-white py-4 rounded-2xl font-bold text-base shadow-lg disabled:opacity-50 active:scale-95 transition"
+              >
+                {loading ? "⏳ جاري التحقق..." : "تأكيد ✓"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setUsernameStep("username"); setUsernameOtp(""); setResolvedPhone(null); setError(null); }}
+                className="w-full text-sm text-[#64748B] underline"
+              >
+                ← تغيير اسم المستخدم
+              </button>
+            </form>
+          )
         )}
 
         {error && (

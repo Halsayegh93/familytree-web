@@ -62,8 +62,30 @@ export default function RegisterPage() {
     setError(null);
 
     const cleanUsername = username.trim().toLowerCase();
+    const cleanedPhone = normalizeDigits(phone);
+    const finalPhone = cleanedPhone ? `${countryCode}${cleanedPhone}` : null;
 
-    // 1) تحقق من اسم المستخدم — لازم يكون متاح
+    // 1) تحقق من رقم الهاتف — إذا مسجل مسبقاً أخبره يدخل برقم الهاتف
+    if (finalPhone) {
+      const { data: existingPhone } = await supabase
+        .from("profiles")
+        .select("id, username")
+        .eq("phone_number", finalPhone)
+        .neq("role", "pending")
+        .maybeSingle();
+
+      if (existingPhone) {
+        setError(
+          existingPhone.username
+            ? `رقم الهاتف مسجل مسبقاً — سجّل دخولك بـ "${existingPhone.username}" أو برقم الهاتف مباشرة`
+            : "رقم الهاتف مسجل مسبقاً — سجّل دخولك برقم هاتفك مباشرة"
+        );
+        setLoading(false);
+        return;
+      }
+    }
+
+    // 2) تحقق من اسم المستخدم — لازم يكون متاح
     const { data: existingUsername, error: checkErr } = await supabase
       .from("profiles")
       .select("id")
@@ -104,8 +126,6 @@ export default function RegisterPage() {
     } else {
       userId = signUpData.user.id;
     }
-    const cleanedPhone = normalizeDigits(phone);
-    const finalPhone = cleanedPhone ? `${countryCode}${cleanedPhone}` : null;
     const nameParts = fullName.trim().split(" ");
 
     const profileData = {
