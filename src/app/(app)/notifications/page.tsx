@@ -22,19 +22,30 @@ export default async function NotificationsPage() {
 
   // للمدراء: نجلب الإشعارات الموجهة + broadcast (target_member_id IS NULL)
   // لغير المدراء: فقط الإشعارات الموجهة
-  let query = supabase
-    .from("notifications")
-    .select("id, title, body, kind, created_at, is_read, created_by, target_member_id, request_id, request_type")
-    .order("created_at", { ascending: false })
-    .limit(300);
+  const SELECT = "id, title, body, kind, created_at, is_read, created_by, target_member_id, request_id, request_type";
 
+  const { data: targeted } = await supabase
+    .from("notifications")
+    .select(SELECT)
+    .eq("target_member_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  let broadcasts: typeof targeted = [];
   if (canModerate) {
-    query = query.or(`target_member_id.eq.${userId},target_member_id.is.null`);
-  } else {
-    query = query.eq("target_member_id", userId);
+    const { data } = await supabase
+      .from("notifications")
+      .select(SELECT)
+      .is("target_member_id", null)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    broadcasts = data ?? [];
   }
 
-  const { data: notifications } = await query;
+  const merged = [...(targeted ?? []), ...broadcasts];
+  // ترتيب بالتاريخ تنازلياً
+  merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const notifications = merged.slice(0, 300);
 
   return (
     <NotificationsClient
