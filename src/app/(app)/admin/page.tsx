@@ -115,6 +115,15 @@ export default async function AdminDashboard() {
           subtitle="أعضاء بدون أب أو بيانات ناقصة"
           color="#5438DC"
         />
+        {canEdit && (
+          <ActionRow
+            href="/admin/branch-supervisors"
+            icon="⭐"
+            title="مشرفو الفروع"
+            subtitle="مسؤول عن اعتماد بيانات كل فرع"
+            color="#F59E0B"
+          />
+        )}
       </Section>
 
       {/* لجنة شؤون العائلة موجودة كتاب داخل الأعضاء الآن */}
@@ -151,6 +160,13 @@ export default async function AdminDashboard() {
             title="إعدادات التطبيق"
             subtitle="التسجيل · الأخبار · الميزات"
             color="#357DED"
+          />
+          <ActionRow
+            href="/admin/system-health"
+            icon="💚"
+            title="صحة النظام"
+            subtitle="النشاط · الأجهزة · الإشعارات"
+            color="#10B981"
           />
           <ActionRow
             href="/admin/devices"
@@ -228,10 +244,16 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden">
-      <div className="px-4 py-2.5 flex items-center gap-2 border-b border-[#E2E8F0]">
+    <div
+      className="bg-white rounded-2xl overflow-hidden"
+      style={{
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06)",
+        borderTop: `3px solid ${color}`,
+      }}
+    >
+      <div className="px-5 py-3 flex items-center gap-2 border-b border-[#F1F5F9]">
         <span className="text-base">{icon}</span>
-        <h2 className="font-black text-sm text-[#0F172A]" style={{ color }}>
+        <h2 className="font-black text-sm" style={{ color }}>
           {title}
         </h2>
       </div>
@@ -259,26 +281,27 @@ function ActionRow({
   return (
     <Link
       href={href}
-      className="group flex items-center gap-2.5 px-3 py-3 hover:bg-[#F8FAFC] transition border-b border-[#E2E8F0] last:border-0"
+      className="group flex items-center gap-3 px-5 py-2.5 hover:bg-[#F8FAFC] transition border-b border-[#F1F5F9] last:border-0"
     >
       <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 transition-transform group-hover:scale-110"
-        style={{ background: `${color}15`, color }}
+        className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0"
+        style={{ background: `${color}10`, color }}
       >
         {icon}
       </div>
       <div className="flex-1 min-w-0">
         <div className="font-bold text-[#0F172A] truncate text-sm">{title}</div>
-        <div className="text-xs text-[#64748B] truncate">{subtitle}</div>
+        <div className="text-[11px] text-[#94A3B8] truncate">{subtitle}</div>
       </div>
       {badge !== undefined && badge > 0 && (
         <span
-          className="min-w-[22px] h-5 px-1.5 rounded-full bg-[#EF4444] text-white text-[10px] font-black flex items-center justify-center"
+          className="min-w-[20px] h-5 px-1.5 rounded-full text-white text-[10px] font-black flex items-center justify-center"
+          style={{ background: color }}
         >
           {badge}
         </span>
       )}
-      <span className="text-base flex-shrink-0" style={{ color }}>←</span>
+      <span className="text-xs text-[#94A3B8] flex-shrink-0 group-hover:text-[#5438DC]">←</span>
     </Link>
   );
 }
