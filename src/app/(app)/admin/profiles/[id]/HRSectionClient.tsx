@@ -32,6 +32,8 @@ function statusInfo(s?: string | null) {
 
 export function HRSectionClient({
   memberId,
+  memberName,
+  memberPhone,
   currentUserId,
   isHrMember,
   canManageHRMembers,
@@ -40,6 +42,8 @@ export function HRSectionClient({
   documents,
 }: {
   memberId: string;
+  memberName?: string | null;
+  memberPhone?: string | null;
   currentUserId: string;
   hrStatus?: string | null;
   isHrMember: boolean;
@@ -50,11 +54,12 @@ export function HRSectionClient({
 }) {
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get("hr") as any) ?? "timeline";
-  const [activeTab, setActiveTab] = useState<"timeline" | "notes" | "contact" | "docs">(
-    ["timeline", "notes", "contact", "docs"].includes(initialTab) ? initialTab : "timeline"
+  const [activeTab, setActiveTab] = useState<"timeline" | "notes" | "contact">(
+    ["timeline", "notes", "contact"].includes(initialTab) ? (initialTab as any) : "timeline"
   );
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
 
-  // التمرير للـ entry المحدد لو فيه ?focus=ID
   useEffect(() => {
     const focusId = searchParams.get("focus");
     if (focusId) {
@@ -69,7 +74,6 @@ export function HRSectionClient({
     }
   }, [searchParams, activeTab]);
 
-  // إحصائيات الحالات (من جميع الـ entries)
   const allEntries = useMemo(() => {
     const entries: any[] = [
       ...notes.map((n) => ({ ...n, type: "note", date: n.created_at })),
@@ -91,53 +95,208 @@ export function HRSectionClient({
   const latestStatus = allEntries.find((e) => e.status)?.status;
   const latestInfo = statusInfo(latestStatus);
 
+  // آخر تواصل / آخر ملاحظة
+  const lastContact = contactLog[0];
+  const lastNote = notes[0];
+
+  // حالة العلاقة (CRM): صحية / يحتاج متابعة / فاتر
+  const lastActivityDate = allEntries[0]?.date;
+  const daysSinceLastActivity = lastActivityDate
+    ? Math.floor((Date.now() - new Date(lastActivityDate).getTime()) / 86400000)
+    : null;
+  const relationshipHealth = (() => {
+    if (!lastActivityDate) return { label: "ما بدأت", emoji: "⚪", color: "#94A3B8" };
+    if (daysSinceLastActivity! <= 30) return { label: "نشطة", emoji: "🟢", color: "#10B981" };
+    if (daysSinceLastActivity! <= 90) return { label: "تحتاج متابعة", emoji: "🟡", color: "#F59E0B" };
+    return { label: "فاترة", emoji: "🔴", color: "#EF4444" };
+  })();
+
+  // E.164 phone للأزرار
+  const phoneE164 = memberPhone?.replace(/\s/g, "").replace(/[^\d+]/g, "");
+
+  // فلترة حسب البحث والحالة
+  const filteredEntries = useMemo(() => {
+    let list = allEntries;
+    if (statusFilter) list = list.filter((e) => e.status === statusFilter);
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter((e) => {
+        const text = `${e.note ?? ""} ${e.reason ?? ""} ${e.summary ?? ""} ${e.title ?? ""}`.toLowerCase();
+        return text.includes(q);
+      });
+    }
+    return list;
+  }, [allEntries, statusFilter, searchQuery]);
+
+  const filteredNotes = useMemo(() => {
+    if (!searchQuery.trim()) return notes;
+    const q = searchQuery.trim().toLowerCase();
+    return notes.filter((n) => (n.note ?? "").toLowerCase().includes(q));
+  }, [notes, searchQuery]);
+
+  const filteredContacts = useMemo(() => {
+    if (!searchQuery.trim()) return contactLog;
+    const q = searchQuery.trim().toLowerCase();
+    return contactLog.filter((c) =>
+      `${c.reason ?? ""} ${c.summary ?? ""}`.toLowerCase().includes(q)
+    );
+  }, [contactLog, searchQuery]);
+
   return (
     <div className="space-y-3">
-      {/* بانر السرية + عضوية اللجنة (مدمجين) */}
-      <div className="bg-gradient-to-l from-[#5438DC]/10 to-[#7C3AED]/10 border border-[#5438DC]/20 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">🔒</span>
-          <div>
-            <div className="font-bold text-[#5438DC] text-sm">سري — لا يراها العضو</div>
-            {latestInfo && (
-              <div className="text-xs text-[#475569] mt-0.5">
-                آخر حالة: <span className="font-bold" style={{ color: latestInfo.color }}>{latestInfo.label}</span>
+      {/* === بانر هيرو احترافي === */}
+      <div className="bg-gradient-to-br from-[#5438DC] via-[#7C3AED] to-[#5438DC] rounded-2xl p-4 text-white shadow-lg">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-xl">
+              🔒
+            </div>
+            <div>
+              <div className="font-black text-sm">شؤون العائلة</div>
+              <div className="text-[11px] text-white/80">رصد ملاحظات السلوك والتواصل • سرّي للجنة فقط</div>
+            </div>
+          </div>
+          {canManageHRMembers && (
+            <HRMembershipToggle memberId={memberId} isHrMember={isHrMember} />
+          )}
+        </div>
+
+        {/* صف الإحصاءات السريعة */}
+        <div className="grid grid-cols-4 gap-2">
+          <HeroStat
+            label="إجمالي"
+            value={allEntries.length}
+            sub={latestInfo ? latestInfo.label : "بدون حالة"}
+          />
+          <HeroStat
+            label="ملاحظات"
+            value={notes.length}
+            sub={lastNote ? timeAgo(lastNote.created_at) : "—"}
+          />
+          <HeroStat
+            label="تواصل"
+            value={contactLog.length}
+            sub={lastContact ? timeAgo(lastContact.contacted_at) : "—"}
+          />
+          <HeroStat
+            label="آخر نشاط"
+            value={allEntries[0] ? "•" : "—"}
+            sub={allEntries[0] ? timeAgo(allEntries[0].date) : "لا يوجد"}
+            isText
+          />
+        </div>
+      </div>
+
+      {/* === حالة العلاقة + أزرار سريعة (CRM) === */}
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-3 flex items-center gap-3 flex-wrap">
+        {/* حالة العلاقة */}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-lg"
+            style={{ background: `${relationshipHealth.color}15` }}
+          >
+            {relationshipHealth.emoji}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] text-[#94A3B8] font-bold">حالة العلاقة</div>
+            <div className="font-black text-sm" style={{ color: relationshipHealth.color }}>
+              {relationshipHealth.label}
+            </div>
+            {daysSinceLastActivity !== null && (
+              <div className="text-[10px] text-[#64748B]">
+                آخر نشاط قبل {daysSinceLastActivity === 0 ? "اليوم" : `${daysSinceLastActivity} يوم`}
               </div>
             )}
           </div>
         </div>
-        {canManageHRMembers && (
-          <HRMembershipToggle memberId={memberId} isHrMember={isHrMember} />
+
+        {/* أزرار اتصال سريع */}
+        {phoneE164 && (
+          <div className="flex items-center gap-1.5">
+            <a
+              href={`tel:${phoneE164}`}
+              className="w-9 h-9 rounded-xl bg-[#10B981]/15 hover:bg-[#10B981] hover:text-white text-[#10B981] flex items-center justify-center transition"
+              title="اتصال"
+            >
+              📞
+            </a>
+            <a
+              href={`https://wa.me/${phoneE164.replace(/\D/g, "")}`}
+              target="_blank"
+              rel="noopener"
+              className="w-9 h-9 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366] hover:text-white text-[#25D366] flex items-center justify-center transition"
+              title="واتساب"
+            >
+              💬
+            </a>
+            <button
+              onClick={() => setActiveTab("contact")}
+              className="px-3 h-9 rounded-xl bg-[#5438DC] text-white text-xs font-bold hover:opacity-90"
+            >
+              + سجل تواصل
+            </button>
+          </div>
         )}
       </div>
 
-      {/* بطاقات الحالات */}
-      {allEntries.length > 0 && (
-        <div className="grid grid-cols-4 gap-2">
-          {STATUSES.map((s) => (
-            <div
-              key={s.value}
-              className="bg-white border border-[#E2E8F0] rounded-xl p-2 text-center"
+      {/* === شريط الأدوات: بحث + فلتر حالة === */}
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-2 space-y-2">
+        {/* البحث */}
+        <div className="flex items-center gap-2 px-2 py-1">
+          <span className="text-[#94A3B8]">🔍</span>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="ابحث في الملاحظات والتواصل..."
+            className="flex-1 outline-none text-sm placeholder:text-[#94A3B8]"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="text-[#94A3B8] hover:text-[#475569] text-sm"
             >
-              <div className="text-2xl font-black" style={{ color: s.color }}>
-                {statusCounts[s.value]}
-              </div>
-              <div className="text-[10px] font-bold text-[#475569] truncate">
-                {s.label}
-              </div>
-            </div>
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* فلتر الحالة */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 px-1">
+          <button
+            onClick={() => setStatusFilter("")}
+            className={`px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition ${
+              statusFilter === "" ? "bg-[#5438DC] text-white" : "bg-[#F1F5F9] text-[#475569]"
+            }`}
+          >
+            الكل {allEntries.length > 0 && `(${allEntries.length})`}
+          </button>
+          {STATUSES.map((s) => (
+            <button
+              key={s.value}
+              onClick={() => setStatusFilter(s.value === statusFilter ? "" : s.value)}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition ${
+                statusFilter === s.value ? "text-white" : "text-[#475569]"
+              }`}
+              style={{
+                background: statusFilter === s.value ? s.color : `${s.color}15`,
+                color: statusFilter === s.value ? "white" : s.color,
+              }}
+            >
+              {s.label} {statusCounts[s.value] > 0 && `(${statusCounts[s.value]})`}
+            </button>
           ))}
         </div>
-      )}
+      </div>
 
-      {/* تابات */}
+      {/* === تابات === */}
       <div className="bg-white rounded-2xl border border-[#E2E8F0] p-1 flex gap-1">
         <Tab
           active={activeTab === "timeline"}
           onClick={() => setActiveTab("timeline")}
           icon="📅"
-          label="الكل"
-          count={allEntries.length}
+          label="الخط الزمني"
+          count={filteredEntries.length}
           color="#5438DC"
         />
         <Tab
@@ -145,7 +304,7 @@ export function HRSectionClient({
           onClick={() => setActiveTab("notes")}
           icon="📝"
           label="ملاحظات"
-          count={notes.length}
+          count={filteredNotes.length}
           color="#F59E0B"
         />
         <Tab
@@ -153,41 +312,62 @@ export function HRSectionClient({
           onClick={() => setActiveTab("contact")}
           icon="📞"
           label="تواصل"
-          count={contactLog.length}
+          count={filteredContacts.length}
           color="#3B82F6"
-        />
-        <Tab
-          active={activeTab === "docs"}
-          onClick={() => setActiveTab("docs")}
-          icon="📁"
-          label="مستندات"
-          count={documents.length}
-          color="#10B981"
         />
       </div>
 
-      {/* محتوى التاب */}
+      {/* === محتوى التاب === */}
       {activeTab === "timeline" && (
         <TimelineView
-          entries={allEntries}
+          entries={filteredEntries}
           memberId={memberId}
           currentUserId={currentUserId}
         />
       )}
       {activeTab === "notes" && (
-        <NotesSection memberId={memberId} currentUserId={currentUserId} notes={notes} />
+        <NotesSection memberId={memberId} currentUserId={currentUserId} notes={filteredNotes} />
       )}
       {activeTab === "contact" && (
-        <ContactLogSection memberId={memberId} currentUserId={currentUserId} log={contactLog} />
-      )}
-      {activeTab === "docs" && (
-        <DocumentsSection memberId={memberId} currentUserId={currentUserId} docs={documents} />
+        <ContactLogSection memberId={memberId} currentUserId={currentUserId} log={filteredContacts} />
       )}
     </div>
   );
 }
 
-// MARK: - Timeline (الكل) — مع تعديل/حذف مباشر
+// عداد منذ متى
+function timeAgo(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "—";
+  const diff = Date.now() - d.getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "الآن";
+  if (min < 60) return `${min}د`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}س`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day}ي`;
+  const mo = Math.floor(day / 30);
+  if (mo < 12) return `${mo}ش`;
+  return `${Math.floor(mo / 12)}س`;
+}
+
+function HeroStat({
+  label, value, sub, isText,
+}: {
+  label: string; value: number | string; sub: string; isText?: boolean;
+}) {
+  return (
+    <div className="bg-white/15 backdrop-blur rounded-xl px-2 py-2 text-center">
+      <div className={`text-[10px] font-bold text-white/70 mb-0.5`}>{label}</div>
+      <div className={`font-black text-white ${isText ? "text-base" : "text-xl"}`}>{value}</div>
+      <div className="text-[9px] text-white/80 truncate mt-0.5">{sub}</div>
+    </div>
+  );
+}
+
+// MARK: - Timeline — تجميع زمني احترافي بمجموعات (اليوم/أمس/هذا الأسبوع/سابق)
 function TimelineView({
   entries, memberId, currentUserId,
 }: {
@@ -198,10 +378,10 @@ function TimelineView({
 
   if (entries.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-8 text-center">
-        <div className="text-4xl mb-2">📭</div>
-        <p className="text-sm text-[#64748B]">لا يوجد سجل بعد</p>
-        <p className="text-xs text-[#94A3B8] mt-1">ابدأ بإضافة ملاحظة أو تواصل أو مستند</p>
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-10 text-center">
+        <div className="text-5xl mb-3">📭</div>
+        <p className="font-bold text-[#0F172A] text-sm">لا توجد سجلات بعد</p>
+        <p className="text-xs text-[#94A3B8] mt-1">ابدأ بإضافة ملاحظة أو تسجيل تواصل من التابات أعلاه</p>
       </div>
     );
   }
@@ -214,17 +394,66 @@ function TimelineView({
     else router.refresh();
   }
 
+  // تجميع بالـ buckets الزمنية
+  const groups: Record<string, any[]> = {
+    today: [],
+    yesterday: [],
+    thisWeek: [],
+    thisMonth: [],
+    older: [],
+  };
+  const now = new Date();
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const todayStart = startOfDay(now);
+  const yestStart = todayStart - 86400000;
+  const weekStart = todayStart - 6 * 86400000;
+  const monthStart = todayStart - 30 * 86400000;
+
+  for (const e of entries) {
+    const t = new Date(e.date).getTime();
+    if (t >= todayStart) groups.today.push(e);
+    else if (t >= yestStart) groups.yesterday.push(e);
+    else if (t >= weekStart) groups.thisWeek.push(e);
+    else if (t >= monthStart) groups.thisMonth.push(e);
+    else groups.older.push(e);
+  }
+
+  const sections: { key: string; label: string; items: any[] }[] = [
+    { key: "today", label: "اليوم", items: groups.today },
+    { key: "yesterday", label: "أمس", items: groups.yesterday },
+    { key: "thisWeek", label: "هذا الأسبوع", items: groups.thisWeek },
+    { key: "thisMonth", label: "هذا الشهر", items: groups.thisMonth },
+    { key: "older", label: "أقدم", items: groups.older },
+  ].filter((s) => s.items.length > 0);
+
   return (
-    <div className="space-y-2">
-      {entries.map((e) =>
-        e.type === "note" ? (
-          <NoteItem key={`note-${e.id}`} note={e} onDelete={() => handleDelete(e)} />
-        ) : e.type === "contact" ? (
-          <ContactItem key={`contact-${e.id}`} item={e} onDelete={() => handleDelete(e)} />
-        ) : (
-          <DocItem key={`doc-${e.id}`} doc={e} onDelete={() => handleDelete(e)} />
-        )
-      )}
+    <div className="space-y-4">
+      {sections.map((section) => (
+        <div key={section.key}>
+          {/* عنوان المجموعة */}
+          <div className="flex items-center gap-2 px-1 mb-2">
+            <div className="h-px flex-1 bg-[#E2E8F0]"></div>
+            <span className="text-[10px] font-black text-[#94A3B8] uppercase tracking-wider px-2">
+              {section.label}
+            </span>
+            <span className="text-[10px] font-bold text-[#94A3B8] bg-[#F1F5F9] px-2 py-0.5 rounded-full">
+              {section.items.length}
+            </span>
+            <div className="h-px flex-1 bg-[#E2E8F0]"></div>
+          </div>
+          <div className="space-y-2">
+            {section.items.map((e) =>
+              e.type === "note" ? (
+                <NoteItem key={`note-${e.id}`} note={e} onDelete={() => handleDelete(e)} />
+              ) : e.type === "contact" ? (
+                <ContactItem key={`contact-${e.id}`} item={e} onDelete={() => handleDelete(e)} />
+              ) : (
+                <DocItem key={`doc-${e.id}`} doc={e} onDelete={() => handleDelete(e)} />
+              )
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -327,6 +556,16 @@ function StatusBadge({ status }: { status?: string | null }) {
 }
 
 // MARK: - Notes
+// قوالب سريعة لتسهيل الإدخال
+const NOTE_TEMPLATES = [
+  { emoji: "👤", label: "سلوك", prefix: "[سلوك] " },
+  { emoji: "🏥", label: "صحة", prefix: "[صحة] " },
+  { emoji: "👨‍👩‍👧‍👦", label: "أسري", prefix: "[أسري] " },
+  { emoji: "💼", label: "عمل", prefix: "[عمل] " },
+  { emoji: "📚", label: "دراسة", prefix: "[دراسة] " },
+  { emoji: "💰", label: "مالي", prefix: "[مالي] " },
+];
+
 function NotesSection({
   memberId, currentUserId, notes,
 }: {
@@ -337,7 +576,6 @@ function NotesSection({
   const [text, setText] = useState("");
   const [status, setStatus] = useState("new");
   const [busy, setBusy] = useState(false);
-  const [showForm, setShowForm] = useState(false);
 
   async function add() {
     if (!text.trim()) return;
@@ -350,7 +588,7 @@ function NotesSection({
     });
     setBusy(false);
     if (error) alert("خطأ: " + error.message);
-    else { setText(""); setStatus("new"); setShowForm(false); router.refresh(); }
+    else { setText(""); setStatus("new"); router.refresh(); }
   }
 
   async function remove(id: string) {
@@ -360,46 +598,76 @@ function NotesSection({
     else router.refresh();
   }
 
+  function applyTemplate(prefix: string) {
+    if (text.startsWith(prefix)) return;
+    // شيل أي prefix قديم وضع الجديد
+    const cleaned = text.replace(/^\[[^\]]+\]\s*/, "");
+    setText(prefix + cleaned);
+  }
+
   return (
     <div className="space-y-3">
-      {!showForm ? (
-        <button
-          onClick={() => setShowForm(true)}
-          className="w-full bg-[#F59E0B] text-white py-3 rounded-2xl font-bold shadow-sm hover:opacity-90"
-        >
-          ➕ إضافة ملاحظة جديدة
-        </button>
-      ) : (
-        <div className="bg-white border border-[#FEF3C7] rounded-2xl p-3 space-y-2">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="اكتب ملاحظة..."
-            rows={3}
-            autoFocus
-            className="w-full px-3 py-2 bg-[#FFFBEB] border border-[#FEF3C7] rounded-lg outline-none focus:ring-2 focus:ring-[#F59E0B] resize-none text-sm"
-          />
-          <div className="flex gap-2 items-center">
-            <StatusSelect value={status} onChange={setStatus} />
-            <button
-              onClick={() => setShowForm(false)}
-              className="px-3 py-2 bg-[#F1F5F9] text-[#475569] rounded-lg font-bold text-xs"
-            >
-              إلغاء
-            </button>
-            <button
-              onClick={add}
-              disabled={busy || !text.trim()}
-              className="flex-1 bg-[#F59E0B] text-white py-2 rounded-lg font-bold text-sm disabled:opacity-50"
-            >
-              {busy ? "..." : "💾 حفظ"}
-            </button>
-          </div>
+      {/* === نموذج الإدخال السريع — دائماً ظاهر === */}
+      <div className="bg-white border border-[#FEF3C7] rounded-2xl overflow-hidden shadow-sm">
+        {/* رأس النموذج */}
+        <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-l from-[#FFFBEB] to-white border-b border-[#FEF3C7]">
+          <span className="text-base">📝</span>
+          <span className="font-bold text-sm text-[#92400E]">ملاحظة جديدة</span>
+          <span className="text-[10px] text-[#94A3B8]">سرّي للجنة فقط</span>
         </div>
-      )}
 
+        {/* قوالب سريعة */}
+        <div className="px-3 pt-2.5 flex flex-wrap gap-1.5">
+          {NOTE_TEMPLATES.map((t) => {
+            const active = text.startsWith(t.prefix);
+            return (
+              <button
+                key={t.label}
+                onClick={() => applyTemplate(t.prefix)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                  active
+                    ? "bg-[#F59E0B] text-white"
+                    : "bg-[#F8FAFC] text-[#475569] hover:bg-[#F1F5F9]"
+                }`}
+              >
+                <span>{t.emoji}</span>
+                <span>{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* النص */}
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") add();
+          }}
+          placeholder="مثال: لاحظت تغير في سلوكه مؤخراً، يحتاج متابعة..."
+          rows={3}
+          className="w-full px-3 py-2.5 mt-2 outline-none resize-none text-sm placeholder:text-[#CBD5E1]"
+        />
+
+        {/* الأزرار */}
+        <div className="flex gap-2 items-center px-3 pb-3 border-t border-[#F1F5F9] pt-2">
+          <StatusSelect value={status} onChange={setStatus} />
+          <span className="text-[10px] text-[#94A3B8] mr-auto hidden md:inline">
+            ⌘ + Enter للحفظ
+          </span>
+          <button
+            onClick={add}
+            disabled={busy || !text.trim()}
+            className="px-5 bg-[#F59E0B] text-white py-2 rounded-lg font-bold text-sm disabled:opacity-50 hover:opacity-90"
+          >
+            {busy ? "..." : "💾 حفظ"}
+          </button>
+        </div>
+      </div>
+
+      {/* الملاحظات الحالية */}
       {notes.length === 0 ? (
-        <EmptyState icon="📝" message="لا توجد ملاحظات" />
+        <EmptyState icon="📝" message="لا توجد ملاحظات بعد" />
       ) : (
         <div className="space-y-2">
           {notes.map((n) => (
@@ -478,20 +746,40 @@ function NoteItem({ note, onDelete }: { note: any; onDelete: (id: string) => voi
 
 function ItemActions({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1.5">
       <button
         onClick={onEdit}
-        title="تعديل"
-        className="w-7 h-7 rounded-lg bg-[#F1F5F9] hover:bg-[#357DED] hover:text-white text-[#357DED] flex items-center justify-center text-sm transition"
+        title="تعديل الإدخال"
+        className="group inline-flex items-center gap-1 px-2.5 h-7 rounded-lg bg-[#357DED]/10 hover:bg-[#357DED] hover:text-white text-[#357DED] text-[11px] font-bold transition border border-[#357DED]/20 hover:border-[#357DED]"
       >
-        ✏️
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className="w-3 h-3"
+        >
+          <path d="M2.695 14.763l-1.262 3.155a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+        </svg>
+        <span>تعديل</span>
       </button>
       <button
         onClick={onDelete}
-        title="حذف"
-        className="w-7 h-7 rounded-lg bg-[#F1F5F9] hover:bg-[#EF4444] hover:text-white text-[#EF4444] flex items-center justify-center text-sm transition"
+        title="حذف الإدخال"
+        className="group inline-flex items-center gap-1 px-2.5 h-7 rounded-lg bg-[#EF4444]/10 hover:bg-[#EF4444] hover:text-white text-[#EF4444] text-[11px] font-bold transition border border-[#EF4444]/20 hover:border-[#EF4444]"
       >
-        🗑️
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className="w-3 h-3"
+        >
+          <path
+            fillRule="evenodd"
+            d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z"
+            clipRule="evenodd"
+          />
+        </svg>
+        <span>حذف</span>
       </button>
     </div>
   );
