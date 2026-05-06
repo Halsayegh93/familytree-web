@@ -280,20 +280,20 @@ function DevicesPanel({ devices, webSessions }: { devices: Device[]; webSessions
 
   return (
     <div className="space-y-4">
-      {/* Unified stats — كل الإحصائيات في مكان واحد */}
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 space-y-3">
-        <div className="flex items-center gap-2">
+      {/* Unified stats — سطر واحد */}
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4">
+        <div className="flex items-center gap-2 mb-3">
           <span className="text-base">📊</span>
           <span className="font-black text-sm text-[#0F172A]">الإجمالي</span>
           <span className="text-xs px-2 py-0.5 rounded-full font-black bg-[#357DED]/15 text-[#357DED] mr-auto">
             {total}
           </span>
         </div>
-        <div className="grid grid-cols-4 gap-2">
-          <MiniStat label="iOS" value={iosCount} color="#357DED" />
-          <MiniStat label="Web" value={webSessions.length} color="#5438DC" />
-          <MiniStat label="Production" value={production} color="#10B981" />
-          <MiniStat label="Sandbox" value={sandbox} color="#F59E0B" />
+        <div className="flex items-center gap-2 flex-wrap">
+          <InlinePill icon="📱" label="iOS" value={iosCount} color="#357DED" />
+          <InlinePill icon="🌐" label="Web" value={webSessions.length} color="#5438DC" />
+          <InlinePill icon="🚀" label="Production" value={production} color="#10B981" />
+          <InlinePill icon="🧪" label="Sandbox" value={sandbox} color="#F59E0B" />
         </div>
       </div>
 
@@ -347,20 +347,20 @@ function PushPanel({ devices, webPushSubs }: { devices: Device[]; webPushSubs: W
 
   return (
     <div className="space-y-4">
-      {/* Unified stats — كل الإحصائيات في مكان واحد */}
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 space-y-3">
-        <div className="flex items-center gap-2">
+      {/* Unified stats — سطر واحد */}
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4">
+        <div className="flex items-center gap-2 mb-3">
           <span className="text-base">📨</span>
           <span className="font-black text-sm text-[#0F172A]">المستلمون</span>
           <span className="text-xs px-2 py-0.5 rounded-full font-black bg-[#5438DC]/15 text-[#5438DC] mr-auto">
             {totalReceivers}
           </span>
         </div>
-        <div className="grid grid-cols-4 gap-2">
-          <MiniStat label="iOS" value={devices.length} color="#357DED" />
-          <MiniStat label="Web" value={webPushSubs.length} color="#10B981" />
-          <MiniStat label="Production" value={production} color="#059669" />
-          <MiniStat label="Sandbox" value={sandbox} color="#F59E0B" />
+        <div className="flex items-center gap-2 flex-wrap">
+          <InlinePill icon="📱" label="iOS" value={devices.length} color="#357DED" />
+          <InlinePill icon="🌐" label="Web" value={webPushSubs.length} color="#10B981" />
+          <InlinePill icon="🚀" label="Production" value={production} color="#059669" />
+          <InlinePill icon="🧪" label="Sandbox" value={sandbox} color="#F59E0B" />
         </div>
       </div>
 
@@ -444,6 +444,19 @@ function BigStat({ icon, label, value, color, highlight }: {
       <div className="text-xl mb-1">{icon}</div>
       <div className="text-2xl font-black" style={{ color: "#0F172A" }}>{value}</div>
       <div className="text-[11px] font-bold" style={{ color }}>{label}</div>
+    </div>
+  );
+}
+
+function InlinePill({ icon, label, value, color }: { icon: string; label: string; value: number; color: string }) {
+  return (
+    <div
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
+      style={{ background: `${color}12`, color }}
+    >
+      <span className="text-sm">{icon}</span>
+      <span>{label}</span>
+      <span className="font-black bg-white/40 px-1.5 rounded-full" style={{ color }}>{value}</span>
     </div>
   );
 }
