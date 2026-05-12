@@ -35,6 +35,7 @@ export default async function AdminDashboard() {
   }
 
   const isOwner = profile?.role === "owner";
+  const isAdminOrOwner = isOwner || profile?.role === "admin";
   const canEdit = ["owner", "admin", "monitor"].includes(profile?.role ?? "");
   // عضو لجنة شؤون العائلة — فقط المحددين بالـ flag (حتى المالك ما يشوف إلا لو محدد)
   const isCommittee = profile?.is_hr_member === true;
@@ -164,7 +165,7 @@ export default async function AdminDashboard() {
         />
       </Section>
 
-      {isOwner && (
+      {isAdminOrOwner && (
         <Section title="إعدادات النظام" icon="⚙️" color="#5438DC">
           <ActionRow
             href="/admin/system-health"
@@ -177,24 +178,28 @@ export default async function AdminDashboard() {
             href="/admin/settings"
             icon="⚙️"
             title="إعدادات التطبيق"
-            subtitle="التسجيل · الأخبار · الميزات · الصيانة"
+            subtitle={isOwner ? "التسجيل · الأخبار · الميزات · الصيانة" : "تصفّح فقط — التعديل للمالك"}
             color="#357DED"
           />
-          <ActionRow
-            href="/admin/moderators"
-            icon="⭐"
-            title="المدراء والمشرفون"
-            subtitle="تعيين الأدوار وإدارة الصلاحيات"
-            color="#5438DC"
-          />
-          <ActionRow
-            href="/admin/banned"
-            icon="🚫"
-            title="الأرقام المحظورة"
-            subtitle="منع أرقام معينة من التسجيل"
-            badge={bannedPhones ?? 0}
-            color="#EF4444"
-          />
+          {isOwner && (
+            <>
+              <ActionRow
+                href="/admin/moderators"
+                icon="⭐"
+                title="المدراء والمشرفون"
+                subtitle="تعيين الأدوار وإدارة الصلاحيات"
+                color="#5438DC"
+              />
+              <ActionRow
+                href="/admin/banned"
+                icon="🚫"
+                title="الأرقام المحظورة"
+                subtitle="منع أرقام معينة من التسجيل"
+                badge={bannedPhones ?? 0}
+                color="#EF4444"
+              />
+            </>
+          )}
         </Section>
       )}
     </main>

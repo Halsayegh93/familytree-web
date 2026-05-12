@@ -4,12 +4,21 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export function SettingsClient({ settings, userId }: { settings: any; userId: string }) {
+export function SettingsClient({
+  settings,
+  userId,
+  canEdit = true,
+}: {
+  settings: any;
+  userId: string;
+  canEdit?: boolean;
+}) {
   const router = useRouter();
   const supabase = createClient();
   const [busy, setBusy] = useState<string | null>(null);
 
   async function toggle(key: string, value: boolean) {
+    if (!canEdit) return;
     setBusy(key);
     const { error } = await supabase
       .from("app_settings")
@@ -111,8 +120,9 @@ export function SettingsClient({ settings, userId }: { settings: any; userId: st
             </div>
             <button
               onClick={() => toggle(t.key, !value)}
-              disabled={busy === t.key}
-              className={`relative w-14 h-8 rounded-full transition disabled:opacity-50 ${
+              disabled={!canEdit || busy === t.key}
+              title={canEdit ? undefined : "التعديل متاح للمالك فقط"}
+              className={`relative w-14 h-8 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed ${
                 value ? "bg-[#10B981]" : "bg-[#E2E8F0]"
               }`}
             >
