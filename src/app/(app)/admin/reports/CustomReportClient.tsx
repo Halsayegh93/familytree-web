@@ -225,12 +225,21 @@ export function CustomReportClient({ members }: { members: Member[] }) {
 
   function age(m: Member): string {
     if (!m.birth_date) return "—";
-    const d = new Date(m.birth_date);
-    if (isNaN(d.getTime())) return "—";
-    const now = new Date();
-    let a = now.getFullYear() - d.getFullYear();
-    const mn = now.getMonth() - d.getMonth();
-    if (mn < 0 || (mn === 0 && now.getDate() < d.getDate())) a--;
+    const birth = new Date(m.birth_date);
+    if (isNaN(birth.getTime())) return "—";
+    // للمتوفّى مع تاريخ وفاة → نحسب عمر الوفاة (من الميلاد للوفاة)
+    // للحيّ أو متوفى بدون تاريخ وفاة → نحسب للحين
+    let endDate: Date;
+    if (m.is_deceased && m.death_date) {
+      const death = new Date(m.death_date);
+      endDate = isNaN(death.getTime()) ? new Date() : death;
+    } else {
+      endDate = new Date();
+    }
+    let a = endDate.getFullYear() - birth.getFullYear();
+    const mn = endDate.getMonth() - birth.getMonth();
+    if (mn < 0 || (mn === 0 && endDate.getDate() < birth.getDate())) a--;
+    if (a < 0) return "—";
     return String(a);
   }
 
