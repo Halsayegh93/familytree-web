@@ -27,7 +27,7 @@ export function FollowUpSearch({ members }: { members: Member[] }) {
     return filteredByStatus
       .filter(
         (m) =>
-          m.full_name.toLowerCase().includes(q) ||
+          (m.full_name ?? "").toLowerCase().includes(q) ||
           (m.phone_number ?? "").includes(q)
       )
       .slice(0, 10);
@@ -70,7 +70,7 @@ export function FollowUpSearch({ members }: { members: Member[] }) {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  m.full_name.charAt(0)
+                  (m.full_name ?? "").charAt(0) || "؟"
                 )}
               </div>
               <div className="flex-1 min-w-0">

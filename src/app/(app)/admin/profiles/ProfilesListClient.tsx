@@ -757,8 +757,8 @@ function Badge({ color, children }: { color: string; children: React.ReactNode }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function initials(name: string): string {
-  return name.trim().charAt(0);
+function initials(name: string | null | undefined): string {
+  return (name ?? "").trim().charAt(0) || "؟";
 }
 
 function roleAr(role: string): string {

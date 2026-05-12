@@ -494,8 +494,8 @@ function Badge({ color, large, children }: { color: string; large?: boolean; chi
   );
 }
 
-function initials(name: string): string {
-  return name.trim().charAt(0);
+function initials(name: string | null | undefined): string {
+  return (name ?? "").trim().charAt(0) || "؟";
 }
 
 function roleAr(role: string): string {
