@@ -288,6 +288,149 @@ export function CustomReportClient({ members }: { members: Member[] }) {
   }
 
   // \u062a\u062d\u0645\u064a\u0644 \u062a\u0642\u0631\u064a\u0631 HTML \u0645\u0635\u0645\u0645 (\u064a\u0641\u062a\u062d \u0628\u0627\u0644\u0645\u062a\u0635\u0641\u062d\u060c \u064a\u0637\u0628\u0639 PDF \u0646\u0638\u064a\u0641\u060c \u0648\u064a\u062a\u0634\u0627\u0631\u0643)
+  async function downloadStyledXLSX() {
+    const ExcelJS = (await import("exceljs")).default;
+    const fields = FIELDS.filter((f) => selected.has(f.key));
+    const dateStr = new Date().toLocaleDateString("ar", {
+      weekday: "long", year: "numeric", month: "long", day: "numeric",
+    });
+    const filterLabel = FILTERS.find((f) => f.key === filter)?.label ?? "";
+    const branchName = branchMember?.full_name ?? "";
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "تطبيق عائلة المحمدعلي";
+    wb.created = new Date();
+
+    const ws = wb.addWorksheet("التقرير", {
+      views: [{ rightToLeft: true, state: "frozen", ySplit: 5 }],
+      pageSetup: {
+        paperSize: 9,
+        orientation: fields.length > 4 ? "landscape" : "portrait",
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        margins: { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 },
+        printTitlesRow: "5:5",
+        horizontalCentered: true,
+      },
+      headerFooter: {
+        oddFooter: "&Lapp.almohali.com&Cعائلة المحمدعلي&Rصفحة &P / &N",
+      },
+    });
+
+    const lastColLetter = (n: number) => {
+      let s = ""; let x = n;
+      while (x > 0) { const r = (x - 1) % 26; s = String.fromCharCode(65 + r) + s; x = Math.floor((x - 1) / 26); }
+      return s;
+    };
+    const totalCols = fields.length + 1;
+    const lastCol = lastColLetter(totalCols);
+
+    // الصف 1: العنوان
+    ws.mergeCells(`A1:${lastCol}1`);
+    const titleCell = ws.getCell("A1");
+    titleCell.value = reportTitle;
+    titleCell.font = { name: "Cairo", size: 18, bold: true, color: { argb: "FF0F172A" } };
+    titleCell.alignment = { horizontal: "right", vertical: "middle", readingOrder: "rtl" };
+    ws.getRow(1).height = 32;
+
+    // الصف 2: الفرع + التاريخ
+    ws.mergeCells(`A2:${lastCol}2`);
+    const subCell = ws.getCell("A2");
+    subCell.value = (branchName ? `🌳 فرع ${branchName}    •    ` : "") + `📅 ${dateStr}`;
+    subCell.font = { name: "Cairo", size: 11, bold: true, color: { argb: "FF5438DC" } };
+    subCell.alignment = { horizontal: "right", vertical: "middle", readingOrder: "rtl" };
+    ws.getRow(2).height = 22;
+
+    // الصف 3: ملخص
+    ws.mergeCells(`A3:${lastCol}3`);
+    const sumCell = ws.getCell("A3");
+    sumCell.value = `👥 العدد: ${filtered.length} عضو    •    🏷️ الفلتر: ${filterLabel}    •    📋 ${fields.map(f => f.label).join(" • ")}`;
+    sumCell.font = { name: "Cairo", size: 10, color: { argb: "FF475569" } };
+    sumCell.alignment = { horizontal: "right", vertical: "middle", readingOrder: "rtl", wrapText: true };
+    ws.getRow(3).height = 20;
+
+    // فاصل
+    ws.getRow(4).height = 6;
+
+    // ترويسة الجدول
+    const headerValues = ["#", ...fields.map((f) => `${f.icon} ${f.label}`)];
+    const headerRow = ws.getRow(5);
+    headerRow.values = headerValues;
+    headerRow.height = 28;
+    headerRow.eachCell((cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF357DED" } };
+      cell.font = { name: "Cairo", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+      cell.alignment = { horizontal: "center", vertical: "middle", readingOrder: "rtl" };
+      cell.border = {
+        top: { style: "thin", color: { argb: "FF1E5BB8" } },
+        bottom: { style: "thin", color: { argb: "FF1E5BB8" } },
+        left: { style: "thin", color: { argb: "FF1E5BB8" } },
+        right: { style: "thin", color: { argb: "FF1E5BB8" } },
+      };
+    });
+
+    // البيانات
+    filtered.forEach((m, i) => {
+      const rowVals = [i + 1, ...fields.map((f) => valueOf(m, f.key))];
+      const r = ws.addRow(rowVals);
+      r.height = 20;
+      const isAlt = i % 2 === 1;
+      r.eachCell((cell, colNumber) => {
+        const fieldDef = colNumber === 1 ? null : fields[colNumber - 2];
+        const muted = cell.value === "—" || cell.value === "لم يدخل";
+        cell.font = {
+          name: "Cairo",
+          size: 10,
+          bold: colNumber === 1 || colNumber === 2,
+          color: { argb: colNumber === 1 ? "FF94A3B8" : (muted ? "FFCBD5E1" : "FF0F172A") },
+        };
+        const isLtrCol = fieldDef?.key === "phone" || fieldDef?.key === "birth_date" || fieldDef?.key === "death_date";
+        cell.alignment = {
+          horizontal: colNumber === 1 ? "center" : (isLtrCol ? "left" : "right"),
+          vertical: "middle",
+          readingOrder: fieldDef?.key === "phone" ? "ltr" : "rtl",
+        };
+        cell.border = {
+          bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+          left: { style: "thin", color: { argb: "FFE2E8F0" } },
+          right: { style: "thin", color: { argb: "FFE2E8F0" } },
+        };
+        if (isAlt) {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+        }
+      });
+    });
+
+    // عرض الأعمدة
+    ws.getColumn(1).width = 6;
+    fields.forEach((f, idx) => {
+      const col = ws.getColumn(idx + 2);
+      switch (f.key) {
+        case "name": col.width = 55; break;
+        case "first_name": col.width = 18; break;
+        case "phone": col.width = 18; break;
+        case "age": col.width = 8; break;
+        case "birth_date":
+        case "death_date":
+        case "last_sign_in":
+          col.width = 16; break;
+        default: col.width = 14;
+      }
+    });
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${fileBaseName()}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function downloadStyledHTML() {
     const fields = FIELDS.filter((f) => selected.has(f.key));
     const dateStr = new Date().toLocaleDateString("ar", {
@@ -732,11 +875,18 @@ export function CustomReportClient({ members }: { members: Member[] }) {
               🔍 معاينة التقرير
             </button>
             <button
-              onClick={downloadStyledHTML}
+              onClick={downloadStyledXLSX}
               disabled={selected.size === 0 || !generated}
               className="px-5 bg-[#10B981] text-white py-3 rounded-2xl font-bold shadow-md disabled:opacity-50"
             >
-              🎨 تقرير مصمّم
+              📊 Excel
+            </button>
+            <button
+              onClick={downloadStyledHTML}
+              disabled={selected.size === 0 || !generated}
+              className="px-5 bg-[#5438DC] text-white py-3 rounded-2xl font-bold shadow-md disabled:opacity-50"
+            >
+              🎨 HTML
             </button>
             <button
               onClick={() => {
