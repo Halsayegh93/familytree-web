@@ -152,14 +152,14 @@ export default async function AdminProfilesPage() {
 
     const { data: rNotes } = await supabase
       .from("hr_notes")
-      .select("id, member_id, note, status, created_at, profiles!hr_notes_member_id_fkey(full_name, avatar_url)")
+      .select("id, member_id, note, created_at, profiles!hr_notes_member_id_fkey(full_name, avatar_url)")
       .order("created_at", { ascending: false })
       .limit(8);
     recentNotes = rNotes ?? [];
 
     const { data: rContact } = await supabase
       .from("hr_contact_log")
-      .select("id, member_id, reason, summary, channel, status, contacted_at, profiles!hr_contact_log_member_id_fkey(full_name, avatar_url)")
+      .select("id, member_id, reason, summary, channel, contacted_at, profiles!hr_contact_log_member_id_fkey(full_name, avatar_url)")
       .order("contacted_at", { ascending: false })
       .limit(8);
     recentContact = rContact ?? [];

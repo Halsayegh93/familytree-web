@@ -83,7 +83,7 @@ export function FollowUpDashboard({
               {items.map((m: any) => (
                 <Link
                   key={m.id}
-                  href={`/admin/profiles/${m.id}`}
+                  href={`/admin/profiles/${m.id}?tab=hr`}
                   className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#F8FAFC] transition"
                 >
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5438DC] to-[#7C3AED] text-white flex items-center justify-center font-bold overflow-hidden flex-shrink-0">

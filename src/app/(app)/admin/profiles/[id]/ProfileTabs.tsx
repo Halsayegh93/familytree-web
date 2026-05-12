@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 
 export function ProfileTabs({
   showHR,
@@ -15,7 +16,25 @@ export function ProfileTabs({
   hr: React.ReactNode;
   admin: React.ReactNode;
 }) {
-  const [tab, setTab] = useState<"overview" | "hr" | "admin">("overview");
+  const searchParams = useSearchParams();
+  // التحديد الافتراضي حسب URL params:
+  // ?tab=hr أو ?hr=notes/contact/docs → افتح تاب شؤون العائلة
+  // ?tab=admin → افتح تاب الإدارة
+  const initialTab: "overview" | "hr" | "admin" = (() => {
+    const tabParam = searchParams.get("tab");
+    const hrParam = searchParams.get("hr");
+    if (showHR && (tabParam === "hr" || hrParam)) return "hr";
+    if (showAdmin && tabParam === "admin") return "admin";
+    return "overview";
+  })();
+
+  const [tab, setTab] = useState<"overview" | "hr" | "admin">(initialTab);
+
+  // إذا تغيّر الـ URL وأنت في الصفحة، حدّث التاب
+  useEffect(() => {
+    setTab(initialTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   return (
     <div className="space-y-4">

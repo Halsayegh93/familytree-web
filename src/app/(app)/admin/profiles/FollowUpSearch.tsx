@@ -62,7 +62,7 @@ export function FollowUpSearch({ members }: { members: Member[] }) {
           {results.map((m) => (
             <Link
               key={m.id}
-              href={`/admin/profiles/${m.id}`}
+              href={`/admin/profiles/${m.id}?tab=hr`}
               className="flex items-center gap-2.5 px-3 py-2 hover:bg-white"
             >
               <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#5438DC] to-[#7C3AED] text-white flex items-center justify-center font-bold text-sm overflow-hidden flex-shrink-0">
