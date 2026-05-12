@@ -614,6 +614,7 @@ function DetailModal({
           <div className="bg-[#F8FAFC] rounded-2xl p-3 space-y-1.5 border border-[#E2E8F0]">
             <InfoRow label="الوقت" value={formatRelative(n.created_at)} />
             <InfoRow label="التاريخ" value={formatFullDate(n.created_at)} />
+            {canModerate && <CopyableIdRow label="رقم الإشعار" value={n.id} />}
             <InfoRow
               label="الحالة"
               value={n.is_read ? "مقروء" : "غير مقروء"}
@@ -717,6 +718,44 @@ function InfoRow({
       <span className="text-sm font-bold" style={{ color: valueColor ?? "#0F172A" }}>
         {value}
       </span>
+    </div>
+  );
+}
+
+function CopyableIdRow({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // ignore
+    }
+  }
+  return (
+    <div className="flex items-center justify-between py-1 gap-2">
+      <span className="text-xs text-[#94A3B8] font-semibold flex-shrink-0">{label}</span>
+      <button
+        onClick={copy}
+        title="انسخ"
+        className="group flex items-center gap-1.5 min-w-0 px-2 py-0.5 rounded-md hover:bg-white active:scale-95 transition"
+        dir="ltr"
+      >
+        <span className="font-mono text-[11px] font-bold text-[#0F172A] truncate select-all" style={{ direction: "ltr" }}>
+          {value}
+        </span>
+        {copied ? (
+          <svg className="w-3.5 h-3.5 text-[#10B981] flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+          </svg>
+        ) : (
+          <svg className="w-3.5 h-3.5 text-[#94A3B8] group-hover:text-[#357DED] flex-shrink-0 transition" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z" />
+            <path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2V5h8a2 2 0 00-2-2H5z" />
+          </svg>
+        )}
+      </button>
     </div>
   );
 }
