@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getProfileId } from "@/lib/get-profile-id";
+import { applyCountableFilters, COUNT_LABELS } from "@/lib/member-counts";
 import { PageBackground } from "@/components/PageHero";
 import Link from "next/link";
 
@@ -19,16 +20,10 @@ export default async function HomePage() {
   const canModerate = MODERATOR_ROLES.includes(profile?.role ?? "");
 
   // ============ بيانات عامة ============
-  const { data: visibleMembers } = await supabase
-    .from("profiles")
-    .select("id, is_hidden_from_tree")
-    .neq("role", "pending")
-    .neq("status", "frozen")
-    .limit(10000);
-
-  const membersCount = (visibleMembers ?? []).filter(
-    (m: any) => !m.is_hidden_from_tree
-  ).length;
+  // عدّاد دقيق على السيرفر بدل تحميل قائمة كاملة وفلترتها بالعميل
+  const { count: membersCount } = await applyCountableFilters(
+    supabase.from("profiles").select("*", { count: "exact", head: true })
+  );
 
   const [
     { count: projectsCount },
@@ -96,8 +91,8 @@ export default async function HomePage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <StatCard
               icon="👨‍👩‍👧"
-              label="أعضاء العائلة"
-              value={membersCount}
+              label={COUNT_LABELS.family}
+              value={membersCount ?? 0}
               gradient="from-[#357DED] to-[#5C9AF2]"
               bgTint="#357DED"
             />

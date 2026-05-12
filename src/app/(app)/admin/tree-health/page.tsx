@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getProfileId } from "@/lib/get-profile-id";
+import { applyCountableFilters } from "@/lib/member-counts";
 import { PageHero, PageBackground } from "@/components/PageHero";
 import { redirect } from "next/navigation";
 
@@ -11,11 +12,11 @@ export default async function TreeHealthPage() {
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", getProfileId(user)!).single();
   if (!MODERATOR_ROLES.includes(profile?.role ?? "")) redirect("/home");
 
-  const { data: members } = await supabase
-    .from("profiles")
-    .select("id, first_name, full_name, father_id, birth_date, phone_number, avatar_url, role, status, is_deceased")
-    .neq("role", "pending")
-    .limit(10000);
+  const { data: members } = await applyCountableFilters(
+    supabase
+      .from("profiles")
+      .select("id, first_name, full_name, father_id, birth_date, phone_number, avatar_url, role, status, is_deceased")
+  ).limit(10000);
 
   const list = members ?? [];
   const noFather = list.filter((m) => !m.father_id);

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getProfileId } from "@/lib/get-profile-id";
+import { applyCountableFilters } from "@/lib/member-counts";
 import { PageHero, PageBackground } from "@/components/PageHero";
 import { redirect } from "next/navigation";
 import { CustomReportClient } from "./CustomReportClient";
@@ -20,15 +21,11 @@ export default async function ReportsPage() {
     { data: members },
     { data: lastSignins },
   ] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, first_name, full_name, phone_number, birth_date, death_date, is_deceased, role, status, gender, is_married, father_id, created_at, sort_order, avatar_url, is_hidden_from_tree")
-      // مطابقة شجرة iOS: استثنِ pending + المخفيّين من الشجرة + المجمّدين + الأسماء الفارغة
-      .neq("role", "pending")
-      .eq("is_hidden_from_tree", false)
-      .neq("status", "frozen")
-      .not("full_name", "is", null)
-      .neq("full_name", "")
+    applyCountableFilters(
+      supabase
+        .from("profiles")
+        .select("id, first_name, full_name, phone_number, birth_date, death_date, is_deceased, role, status, gender, is_married, father_id, created_at, sort_order, avatar_url")
+    )
       .order("full_name", { ascending: true })
       .limit(10000),
     supabase.rpc("get_members_last_signin"),

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getProfileId } from "@/lib/get-profile-id";
+import { applyCountableFilters } from "@/lib/member-counts";
 import { PageHero, PageBackground } from "@/components/PageHero";
 import { redirect } from "next/navigation";
 import { PrintButton } from "./PrintButton";
@@ -16,11 +17,12 @@ export default async function AnalyticsPage() {
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", getProfileId(user)!).single();
   if (!MODERATOR_ROLES.includes(profile?.role ?? "")) redirect("/home");
 
-  const { data: allMembers } = await supabase
-    .from("profiles")
-    .select("id, full_name, role, status, phone_number, is_deceased, created_at, birth_date, father_id, gender, is_married, avatar_url, sort_order")
-    .neq("role", "pending")
-    .limit(10000);
+  // أعضاء العائلة بالتعريف القانوني (يطابق الشجرة + iOS + التقارير)
+  const { data: allMembers } = await applyCountableFilters(
+    supabase
+      .from("profiles")
+      .select("id, full_name, role, status, phone_number, is_deceased, created_at, birth_date, father_id, gender, is_married, avatar_url, sort_order")
+  ).limit(10000);
 
   // آخر تسجيل دخول لكل عضو من auth.users
   const { data: lastSignins } = await supabase.rpc("get_members_last_signin");

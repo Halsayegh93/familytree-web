@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getProfileId } from "@/lib/get-profile-id";
+import { applyCountableFilters, COUNT_LABELS } from "@/lib/member-counts";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { PageHero, PageBackground } from "@/components/PageHero";
@@ -47,7 +48,8 @@ export default async function AdminDashboard() {
     { count: bannedPhones },
     { count: frozenAccounts },
   ] = await Promise.all([
-    supabase.from("profiles").select("*", { count: "exact", head: true }),
+    // إجمالي أعضاء العائلة بالتعريف القانوني (يطابق الشجرة + iOS)
+    applyCountableFilters(supabase.from("profiles").select("*", { count: "exact", head: true })),
     supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "pending"),
     supabase.from("projects").select("*", { count: "exact", head: true }).eq("approval_status", "pending"),
     supabase.from("diwaniyas").select("*", { count: "exact", head: true }).eq("approval_status", "pending"),
@@ -66,7 +68,7 @@ export default async function AdminDashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <StatCard label="إجمالي الأعضاء" value={totalMembers ?? 0} icon="👥" color="#357DED" />
+        <StatCard label={COUNT_LABELS.family} value={totalMembers ?? 0} icon="👥" color="#357DED" />
         <StatCard label="طلبات معلقة" value={pendingMembers ?? 0} icon="⏳" color="#F59E0B" badge />
         <StatCard label="مشاريع للموافقة" value={pendingProjects ?? 0} icon="💼" color="#3B82F6" badge />
         <StatCard label="حسابات مجمّدة" value={frozenAccounts ?? 0} icon="🔒" color="#EF4444" />
