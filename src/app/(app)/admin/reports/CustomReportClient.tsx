@@ -302,7 +302,6 @@ export function CustomReportClient({ members }: { members: Member[] }) {
     wb.created = new Date();
 
     const ws = wb.addWorksheet("التقرير", {
-      views: [{ rightToLeft: true, state: "frozen", ySplit: 5 }],
       pageSetup: {
         paperSize: 9,
         orientation: fields.length > 4 ? "landscape" : "portrait",
@@ -310,7 +309,6 @@ export function CustomReportClient({ members }: { members: Member[] }) {
         fitToWidth: 1,
         fitToHeight: 0,
         margins: { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 },
-        printTitlesRow: "5:5",
         horizontalCentered: true,
       },
       headerFooter: {
@@ -326,39 +324,77 @@ export function CustomReportClient({ members }: { members: Member[] }) {
     const totalCols = fields.length + 1;
     const lastCol = lastColLetter(totalCols);
 
-    // الصف 1: العنوان
-    ws.mergeCells(`A1:${lastCol}1`);
-    const titleCell = ws.getCell("A1");
+    // ===== ترويسة الوثيقة (key/value منظّمة) =====
+    let rowIdx = 0;
+
+    // 1) Eyebrow صغير رمادي بأحرف لاتينية كبيرة
+    rowIdx++;
+    ws.mergeCells(`A${rowIdx}:${lastCol}${rowIdx}`);
+    const eyeCell = ws.getCell(`A${rowIdx}`);
+    eyeCell.value = "AL-MOHAMMADALI FAMILY  ·  REPORT";
+    eyeCell.font = { name: "Cairo", size: 9, bold: true, color: { argb: "FF94A3B8" } };
+    eyeCell.alignment = { horizontal: "right", vertical: "middle" };
+    ws.getRow(rowIdx).height = 16;
+
+    // 2) العنوان الكبير
+    rowIdx++;
+    ws.mergeCells(`A${rowIdx}:${lastCol}${rowIdx}`);
+    const titleCell = ws.getCell(`A${rowIdx}`);
     titleCell.value = reportTitle;
-    titleCell.font = { name: "Cairo", size: 18, bold: true, color: { argb: "FF0F172A" } };
+    titleCell.font = { name: "Cairo", size: 20, bold: true, color: { argb: "FF0F172A" } };
     titleCell.alignment = { horizontal: "right", vertical: "middle", readingOrder: "rtl" };
-    ws.getRow(1).height = 32;
+    ws.getRow(rowIdx).height = 34;
 
-    // الصف 2: الفرع + التاريخ
-    ws.mergeCells(`A2:${lastCol}2`);
-    const subCell = ws.getCell("A2");
-    subCell.value = (branchName ? `🌳 فرع ${branchName}    •    ` : "") + `📅 ${dateStr}`;
-    subCell.font = { name: "Cairo", size: 11, bold: true, color: { argb: "FF5438DC" } };
-    subCell.alignment = { horizontal: "right", vertical: "middle", readingOrder: "rtl" };
-    ws.getRow(2).height = 22;
+    // 3) فاصل صغير
+    rowIdx++;
+    ws.getRow(rowIdx).height = 6;
 
-    // الصف 3: ملخص
-    ws.mergeCells(`A3:${lastCol}3`);
-    const sumCell = ws.getCell("A3");
-    sumCell.value = `👥 العدد: ${filtered.length} عضو    •    🏷️ الفلتر: ${filterLabel}    •    📋 ${fields.map(f => f.label).join(" • ")}`;
-    sumCell.font = { name: "Cairo", size: 10, color: { argb: "FF475569" } };
-    sumCell.alignment = { horizontal: "right", vertical: "middle", readingOrder: "rtl", wrapText: true };
-    ws.getRow(3).height = 20;
+    // 4) صفوف معلومات (label : value) — سطر لكل بند
+    const addMetaRow = (label: string, value: string, valueArgb = "FF0F172A") => {
+      rowIdx++;
+      ws.mergeCells(`A${rowIdx}:${lastCol}${rowIdx}`);
+      const cell = ws.getCell(`A${rowIdx}`);
+      cell.value = {
+        richText: [
+          { text: `${label}    `, font: { name: "Cairo", size: 11, color: { argb: "FF64748B" } } },
+          { text: value, font: { name: "Cairo", size: 11, bold: true, color: { argb: valueArgb } } },
+        ],
+      };
+      cell.alignment = { horizontal: "right", vertical: "middle", readingOrder: "rtl", wrapText: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+      cell.border = { bottom: { style: "thin", color: { argb: "FFE2E8F0" } } };
+      ws.getRow(rowIdx).height = 22;
+    };
 
-    // فاصل
-    ws.getRow(4).height = 6;
+    addMetaRow("📅  التاريخ:", dateStr);
+    if (branchName) addMetaRow("🌳  الفرع:", branchName, "FF5438DC");
+    addMetaRow("🏷️  الفلتر:", filterLabel);
+    addMetaRow("📋  الحقول المعروضة:", fields.map((f) => f.label).join("  •  "));
+    addMetaRow("👥  إجمالي الأعضاء:", `${filtered.length} عضو`, "FF357DED");
 
-    // ترويسة الجدول
+    // 5) فاصل + شريط ملوّن قبل الجدول
+    rowIdx++;
+    ws.getRow(rowIdx).height = 8;
+
+    rowIdx++;
+    ws.mergeCells(`A${rowIdx}:${lastCol}${rowIdx}`);
+    const dividerCell = ws.getCell(`A${rowIdx}`);
+    dividerCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF357DED" } };
+    ws.getRow(rowIdx).height = 4;
+
+    rowIdx++;
+    ws.getRow(rowIdx).height = 8;
+
+    // 6) ترويسة الجدول (تثبّت + تتكرر بالطباعة)
+    rowIdx++;
+    const headerRowIdx = rowIdx;
     const headerValues = ["#", ...fields.map((f) => `${f.icon} ${f.label}`)];
-    const headerRow = ws.getRow(5);
+    const headerRow = ws.getRow(headerRowIdx);
     headerRow.values = headerValues;
     headerRow.height = 28;
-    headerRow.eachCell((cell) => {
+    // طبّق الستايل على كل خلية في صف الترويسة (نمشي يدوياً عشان الخلايا الفارغة)
+    for (let c = 1; c <= totalCols; c++) {
+      const cell = headerRow.getCell(c);
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF357DED" } };
       cell.font = { name: "Cairo", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
       cell.alignment = { horizontal: "center", vertical: "middle", readingOrder: "rtl" };
@@ -368,12 +404,17 @@ export function CustomReportClient({ members }: { members: Member[] }) {
         left: { style: "thin", color: { argb: "FF1E5BB8" } },
         right: { style: "thin", color: { argb: "FF1E5BB8" } },
       };
-    });
+    }
 
-    // البيانات
+    // ثبّت الترويسة (تبقى ظاهرة عند التمرير) + كرّرها بكل صفحة طباعة
+    ws.views = [{ rightToLeft: true, state: "frozen", ySplit: headerRowIdx }];
+    ws.pageSetup.printTitlesRow = `${headerRowIdx}:${headerRowIdx}`;
+
+    // البيانات (استخدم فهارس صريحة عشان ما تتعارض مع الصفوف اليدوية أعلاه)
     filtered.forEach((m, i) => {
       const rowVals = [i + 1, ...fields.map((f) => valueOf(m, f.key))];
-      const r = ws.addRow(rowVals);
+      const r = ws.getRow(headerRowIdx + 1 + i);
+      r.values = rowVals;
       r.height = 20;
       const isAlt = i % 2 === 1;
       r.eachCell((cell, colNumber) => {
