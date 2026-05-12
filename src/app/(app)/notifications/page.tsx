@@ -43,15 +43,40 @@ export default async function NotificationsPage() {
   }
 
   const merged = [...(targeted ?? []), ...broadcasts];
-  // ترتيب بالتاريخ تنازلياً
   merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   const notifications = merged.slice(0, 300);
+
+  // جلب أسماء المنشئين + الأعضاء المستهدفين (للمدراء فقط — لعرض bywho)
+  let creators: Record<string, { full_name: string | null; avatar_url: string | null; role: string | null }> = {};
+  if (canModerate) {
+    const ids = Array.from(
+      new Set(
+        notifications
+          .flatMap((n) => [n.created_by, n.target_member_id])
+          .filter((x): x is string => !!x),
+      ),
+    );
+    if (ids.length > 0) {
+      const { data: people } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url, role")
+        .in("id", ids);
+      (people ?? []).forEach((p) => {
+        creators[p.id] = {
+          full_name: p.full_name,
+          avatar_url: p.avatar_url,
+          role: p.role,
+        };
+      });
+    }
+  }
 
   return (
     <NotificationsClient
       initialNotifications={notifications ?? []}
       userId={userId}
       canModerate={canModerate}
+      creators={creators}
     />
   );
 }
