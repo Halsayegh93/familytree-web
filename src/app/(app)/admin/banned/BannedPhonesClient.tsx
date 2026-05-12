@@ -18,9 +18,10 @@ export function BannedPhonesClient({ banned, userId }: { banned: any[]; userId: 
 
     setBusy(true);
     const { error } = await supabase.from("banned_phones").insert({
-      phone: finalPhone,
+      phone_number: finalPhone,
       reason: reason.trim() || null,
       banned_by: userId,
+      is_active: true,
     });
     setBusy(false);
     if (error) alert("خطأ: " + error.message);
@@ -87,7 +88,7 @@ export function BannedPhonesClient({ banned, userId }: { banned: any[]; userId: 
                 🚫
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-bold text-[#0F172A]" dir="ltr">{b.phone}</div>
+                <div className="font-bold text-[#0F172A]" dir="ltr">{b.phone_number ?? b.phone}</div>
                 {b.reason && <div className="text-xs text-[#64748B]">{b.reason}</div>}
                 <div className="text-xs text-[#64748B]">
                   {new Date(b.created_at).toLocaleDateString("ar")}
