@@ -21,7 +21,8 @@ type Updates = {
 export async function updateMemberAction(
   memberId: string,
   updates: Updates,
-  oldFirstName: string
+  oldFirstName: string,
+  oldFullName?: string
 ) {
   const supabase = await createClient();
 
@@ -35,9 +36,16 @@ export async function updateMemberAction(
     return { success: false, error: updErr.message };
   }
 
-  // 2) إذا تغيّر first_name → نُحدّث full_name لكل الأحفاد
+  // 2) إعادة بناء full_name لكل الذرّية — يشتغل لو تغيّر first_name أو full_name
+  // (ساعات المدير يصلّح فقط الجزء الأوسط من الاسم بدون تغيير الاسم الأول)
   let cascadeCount = 0;
-  if (updates.first_name && updates.first_name !== oldFirstName) {
+  const firstNameChanged =
+    updates.first_name !== undefined && updates.first_name !== oldFirstName;
+  const fullNameChanged =
+    updates.full_name !== undefined &&
+    oldFullName !== undefined &&
+    updates.full_name !== oldFullName;
+  if (firstNameChanged || fullNameChanged) {
     cascadeCount = await cascadeFullName(supabase, memberId);
   }
 
@@ -75,11 +83,16 @@ async function cascadeFullName(
 
   let count = 0;
   for (const child of children) {
-    const newFullName = `${child.first_name} ${parent.full_name}`;
-    await supabase
+    const newFullName = `${child.first_name ?? ""} ${parent.full_name}`.trim();
+    const { error: childErr } = await supabase
       .from("profiles")
       .update({ full_name: newFullName })
       .eq("id", child.id);
+    if (childErr) {
+      // ما نوقف الـcascade — نسجّل ونكمل عشان باقي الأحفاد ينفع لهم
+      console.error(`[cascadeFullName] فشل تحديث ${child.id}:`, childErr.message);
+      continue;
+    }
     count++;
     // recurse للأحفاد
     count += await cascadeFullName(supabase, child.id);

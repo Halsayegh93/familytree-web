@@ -68,7 +68,12 @@ export function MemberFullEditClient({
       updates.role = role;
     }
 
-    const result = await updateMemberAction(member.id, updates, member.first_name ?? "");
+    const result = await updateMemberAction(
+      member.id,
+      updates,
+      member.first_name ?? "",
+      member.full_name ?? ""
+    );
 
     setBusy(false);
     if (!result.success) {
