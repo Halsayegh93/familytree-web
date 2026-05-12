@@ -18,7 +18,6 @@ export default function LoginPage() {
   // Username + Password
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,7 +119,7 @@ export default function LoginPage() {
         {tab === "phone" &&
           (otpStep === "phone" ? (
             <form onSubmit={sendOtp} className="space-y-3">
-              <Section title="📱 الدخول برقم الهاتف">
+              <Section>
                 <Field label="رقم الهاتف">
                   <div className="flex gap-2" dir="ltr">
                     <div className="flex items-center gap-1 px-3 bg-[#F1F5F9] rounded-xl text-sm font-bold flex-shrink-0 border border-[#E2E8F0]">
@@ -152,7 +151,7 @@ export default function LoginPage() {
             </form>
           ) : (
             <form onSubmit={verifyOtp} className="space-y-3">
-              <Section title="✓ تحقق من الرمز">
+              <Section>
                 <Field label="رمز التحقق (6 أرقام)">
                   <input
                     type="text"
@@ -192,7 +191,7 @@ export default function LoginPage() {
         {/* ─── Username + Password tab ────────────────────────────── */}
         {tab === "username" && (
           <form onSubmit={signInWithUsername} className="space-y-3">
-            <Section title="🔐 الدخول باسم المستخدم">
+            <Section>
               <Field label="اسم المستخدم">
                 <input
                   type="text"
@@ -208,26 +207,16 @@ export default function LoginPage() {
               </Field>
 
               <Field label="كلمة السر">
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="inp pr-12"
-                    dir="ltr"
-                    required
-                    autoComplete="current-password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((s) => !s)}
-                    className="absolute top-1/2 -translate-y-1/2 left-3 text-[#64748B] hover:text-[#357DED] transition p-1"
-                    aria-label={showPassword ? "إخفاء كلمة السر" : "إظهار كلمة السر"}
-                  >
-                    {showPassword ? "🙈" : "👁️"}
-                  </button>
-                </div>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="inp"
+                  dir="ltr"
+                  required
+                  autoComplete="current-password"
+                />
               </Field>
             </Section>
 
@@ -309,13 +298,10 @@ function TabBtn({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden">
-      <div className="px-4 py-3 border-b border-[#F1F5F9] bg-[#F8FAFC]">
-        <span className="text-sm font-black text-[#0F172A]">{title}</span>
-      </div>
-      <div className="p-4 space-y-3">{children}</div>
+    <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 space-y-3">
+      {children}
     </div>
   );
 }
