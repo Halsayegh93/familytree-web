@@ -15,11 +15,10 @@ export default function LoginPage() {
   const [otp, setOtp] = useState("");
   const [otpStep, setOtpStep] = useState<"phone" | "otp">("phone");
 
-  // Username → Phone lookup → OTP
+  // Username + Password
   const [username, setUsername] = useState("");
-  const [usernameStep, setUsernameStep] = useState<"username" | "otp">("username");
-  const [resolvedPhone, setResolvedPhone] = useState<string | null>(null);
-  const [usernameOtp, setUsernameOtp] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,247 +64,289 @@ export default function LoginPage() {
     setLoading(false);
   }
 
-  // ─── Username → Phone OTP flow ─────────────────────────────────
-  async function lookupUsername(e: React.FormEvent) {
+  // ─── Username + Password flow ──────────────────────────────────
+  async function signInWithUsername(e: React.FormEvent) {
     e.preventDefault();
-    if (!username.trim()) return;
+    const cleanUsername = username.trim().toLowerCase();
+    if (!cleanUsername || !password) return;
+
     setLoading(true);
     setError(null);
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("phone_number, username")
-      .eq("username", username.trim().toLowerCase())
-      .maybeSingle();
+    const email = `${cleanUsername}@familytree.local`;
+    const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
 
-    if (!profile) {
-      setError("اسم المستخدم غير موجود — سجّل دخولك برقم هاتفك");
+    if (signInErr) {
+      if (signInErr.message?.toLowerCase().includes("invalid")) {
+        setError("اسم المستخدم أو كلمة السر غير صحيحة");
+      } else {
+        setError(signInErr.message);
+      }
       setLoading(false);
       return;
     }
 
-    if (!profile.phone_number) {
-      setError("هذا الحساب ليس له رقم هاتف — تواصل مع الإدارة");
-      setLoading(false);
-      return;
-    }
-
-    const { error: otpError } = await supabase.auth.signInWithOtp({ phone: profile.phone_number });
-    if (otpError) {
-      setError("خطأ في إرسال الرمز — " + otpError.message);
-      setLoading(false);
-      return;
-    }
-
-    setResolvedPhone(profile.phone_number);
-    setUsernameStep("otp");
-    setLoading(false);
+    await supabase.rpc("touch_last_active");
+    router.push("/home");
+    router.refresh();
   }
 
-  async function verifyUsernameOtp(e: React.FormEvent) {
-    e.preventDefault();
-    if (usernameOtp.length !== 6 || !resolvedPhone) return;
-    setLoading(true);
-    setError(null);
-
-    const { error } = await supabase.auth.verifyOtp({
-      phone: resolvedPhone,
-      token: usernameOtp,
-      type: "sms",
-    });
-    if (error) {
-      setError(error.message);
-    } else {
-      await supabase.rpc("touch_last_active");
-      router.push("/home");
-      router.refresh();
-    }
-    setLoading(false);
-  }
-
-  // مسح الأخطاء عند تبديل التاب
   function switchTab(t: "phone" | "username") {
     setTab(t);
     setError(null);
   }
 
-  // عرض آخر 4 أرقام من الهاتف (للخصوصية)
-  function maskedPhone(p: string) {
-    const digits = p.replace(/\D/g, "");
-    return `**** ${digits.slice(-4)}`;
-  }
-
   return (
-    <main className="flex-1 flex items-start md:items-center justify-center p-4 pt-8 md:pt-4">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-6 md:p-8 space-y-5">
-
-        <div className="text-center space-y-2">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-[#357DED] to-[#10B981] flex items-center justify-center text-3xl">
+    <main className="min-h-screen flex items-center justify-center p-4 py-10 bg-[#F8FAFC]">
+      <div className="w-full max-w-md space-y-4">
+        {/* Header */}
+        <div className="text-center space-y-3">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-[#357DED] to-[#10B981] flex items-center justify-center text-3xl shadow-lg">
             🌳
           </div>
-          <h1 className="text-2xl font-black text-[#0F172A]">عائلة المحمدعلي</h1>
-          <p className="text-sm text-[#64748B]">سجّل دخولك</p>
+          <div>
+            <h1 className="text-2xl font-black text-[#0F172A]">عائلة المحمدعلي</h1>
+            <p className="text-sm text-[#64748B] mt-1">سجّل دخولك للمتابعة</p>
+          </div>
         </div>
 
-        {/* تابات */}
-        <div className="bg-[#F1F5F9] rounded-xl p-1 flex gap-1">
+        {/* Tabs */}
+        <div className="bg-white rounded-2xl border border-[#E2E8F0] p-1 flex gap-1">
           <TabBtn active={tab === "phone"} onClick={() => switchTab("phone")} icon="📱" label="رقم الهاتف" />
           <TabBtn active={tab === "username"} onClick={() => switchTab("username")} icon="👤" label="اسم مستخدم" />
         </div>
 
-        {/* ─── تاب الهاتف ─────────────────────────────────────────── */}
-        {tab === "phone" && (
-          otpStep === "phone" ? (
+        {/* ─── Phone tab ─────────────────────────────────────────── */}
+        {tab === "phone" &&
+          (otpStep === "phone" ? (
             <form onSubmit={sendOtp} className="space-y-3">
-              <div className="flex gap-2" dir="ltr">
-                <div className="flex items-center gap-1 px-3 bg-[#F1F5F9] rounded-2xl text-sm font-bold flex-shrink-0">
-                  🇰🇼 <span dir="ltr">+965</span>
-                </div>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  placeholder="رقم الهاتف"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="flex-1 min-w-0 px-4 py-3 bg-[#F1F5F9] rounded-2xl text-base font-bold outline-none focus:ring-2 focus:ring-[#357DED]"
-                  dir="ltr"
-                  autoFocus
-                  required
-                />
-              </div>
-              <button
-                type="submit"
+              <Section title="📱 الدخول برقم الهاتف">
+                <Field label="رقم الهاتف">
+                  <div className="flex gap-2" dir="ltr">
+                    <div className="flex items-center gap-1 px-3 bg-[#F1F5F9] rounded-xl text-sm font-bold flex-shrink-0 border border-[#E2E8F0]">
+                      🇰🇼 <span dir="ltr">+965</span>
+                    </div>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="XXXXXXXX"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="inp flex-1"
+                      dir="ltr"
+                      autoFocus
+                      required
+                    />
+                  </div>
+                </Field>
+              </Section>
+
+              <SubmitButton
                 disabled={loading || cleanPhone.length < 7}
-                className="w-full bg-gradient-to-r from-[#357DED] to-[#10B981] text-white py-4 rounded-2xl font-bold text-base shadow-lg disabled:opacity-50 active:scale-95 transition"
+                loading={loading}
+                loadingLabel="جاري الإرسال..."
               >
-                {loading ? "⏳ جاري الإرسال..." : "إرسال رمز ←"}
-              </button>
+                إرسال رمز التحقق
+              </SubmitButton>
             </form>
           ) : (
             <form onSubmit={verifyOtp} className="space-y-3">
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                placeholder="------"
-                value={otp}
-                onChange={(e) => setOtp(normalizeDigits(e.target.value).slice(0, 6))}
-                className="w-full px-4 py-4 bg-[#F1F5F9] rounded-2xl text-3xl font-black text-center tracking-widest outline-none focus:ring-2 focus:ring-[#357DED]"
-                autoFocus
-                required
-              />
-              <button
-                type="submit"
+              <Section title="✓ تحقق من الرمز">
+                <Field label="رمز التحقق (6 أرقام)">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="------"
+                    value={otp}
+                    onChange={(e) => setOtp(normalizeDigits(e.target.value).slice(0, 6))}
+                    className="inp text-center text-2xl font-black tracking-[0.5em]"
+                    autoFocus
+                    required
+                  />
+                </Field>
+              </Section>
+
+              <SubmitButton
                 disabled={loading || otp.length !== 6}
-                className="w-full bg-gradient-to-r from-[#357DED] to-[#10B981] text-white py-4 rounded-2xl font-bold text-base shadow-lg disabled:opacity-50 active:scale-95 transition"
+                loading={loading}
+                loadingLabel="جاري التحقق..."
               >
-                {loading ? "⏳ جاري التحقق..." : "تأكيد ✓"}
-              </button>
+                تأكيد وتسجيل الدخول
+              </SubmitButton>
               <button
                 type="button"
-                onClick={() => { setOtpStep("phone"); setOtp(""); setError(null); }}
-                className="w-full text-sm text-[#64748B] underline"
+                onClick={() => {
+                  setOtpStep("phone");
+                  setOtp("");
+                  setError(null);
+                }}
+                className="w-full text-sm text-[#64748B] hover:text-[#357DED] font-semibold transition"
               >
-                تغيير الرقم
+                ← تغيير الرقم
               </button>
             </form>
-          )
-        )}
+          ))}
 
-        {/* ─── تاب اسم المستخدم ────────────────────────────────────── */}
+        {/* ─── Username + Password tab ────────────────────────────── */}
         {tab === "username" && (
-          usernameStep === "username" ? (
-            <form onSubmit={lookupUsername} className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-[#475569] mb-1.5">اسم المستخدم</label>
+          <form onSubmit={signInWithUsername} className="space-y-3">
+            <Section title="🔐 الدخول باسم المستخدم">
+              <Field label="اسم المستخدم">
                 <input
                   type="text"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))}
                   placeholder="username"
-                  className="w-full px-4 py-3 bg-[#F1F5F9] rounded-2xl text-base font-bold outline-none focus:ring-2 focus:ring-[#357DED]"
+                  className="inp"
                   dir="ltr"
                   autoFocus
                   required
+                  autoComplete="username"
                 />
-              </div>
+              </Field>
 
-              <button
-                type="submit"
-                disabled={loading || !username.trim()}
-                className="w-full bg-gradient-to-r from-[#357DED] to-[#10B981] text-white py-4 rounded-2xl font-bold text-base shadow-lg disabled:opacity-50 active:scale-95 transition"
-              >
-                {loading ? "⏳ جاري البحث..." : "تسجيل الدخول ←"}
-              </button>
+              <Field label="كلمة السر">
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="inp pr-12"
+                    dir="ltr"
+                    required
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((s) => !s)}
+                    className="absolute top-1/2 -translate-y-1/2 left-3 text-[#64748B] hover:text-[#357DED] transition p-1"
+                    aria-label={showPassword ? "إخفاء كلمة السر" : "إظهار كلمة السر"}
+                  >
+                    {showPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              </Field>
+            </Section>
 
-              <div className="flex items-center justify-between pt-1">
-                <Link href="/register" className="text-sm font-bold text-[#357DED] hover:underline">
-                  تسجيل جديد
-                </Link>
-                <Link href="/reset-password" className="text-sm text-[#94A3B8] hover:text-[#357DED] font-semibold">
-                  ما عندك اسم مستخدم؟
-                </Link>
-              </div>
-            </form>
-          ) : (
-            /* بعد العثور على الهاتف — إرسال OTP */
-            <form onSubmit={verifyUsernameOtp} className="space-y-3">
-              <div className="p-3 bg-[#EBF3FE] rounded-xl text-center">
-                <p className="text-xs text-[#475569] font-semibold">تم إرسال رمز التحقق إلى</p>
-                <p className="text-base font-black text-[#357DED] mt-0.5" dir="ltr">
-                  {maskedPhone(resolvedPhone!)}
-                </p>
-              </div>
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                placeholder="------"
-                value={usernameOtp}
-                onChange={(e) => setUsernameOtp(normalizeDigits(e.target.value).slice(0, 6))}
-                className="w-full px-4 py-4 bg-[#F1F5F9] rounded-2xl text-3xl font-black text-center tracking-widest outline-none focus:ring-2 focus:ring-[#357DED]"
-                autoFocus
-                required
-              />
-              <button
-                type="submit"
-                disabled={loading || usernameOtp.length !== 6}
-                className="w-full bg-gradient-to-r from-[#357DED] to-[#10B981] text-white py-4 rounded-2xl font-bold text-base shadow-lg disabled:opacity-50 active:scale-95 transition"
-              >
-                {loading ? "⏳ جاري التحقق..." : "تأكيد ✓"}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setUsernameStep("username"); setUsernameOtp(""); setResolvedPhone(null); setError(null); }}
-                className="w-full text-sm text-[#64748B] underline"
-              >
-                ← تغيير اسم المستخدم
-              </button>
-            </form>
-          )
+            <SubmitButton
+              disabled={loading || !username.trim() || !password}
+              loading={loading}
+              loadingLabel="جاري الدخول..."
+            >
+              تسجيل الدخول
+            </SubmitButton>
+
+            <div className="flex items-center justify-between pt-1">
+              <Link href="/register" className="text-sm font-bold text-[#357DED] hover:underline">
+                تسجيل جديد ←
+              </Link>
+              <Link href="/reset-password" className="text-sm text-[#64748B] hover:text-[#357DED] font-semibold transition">
+                نسيت كلمة السر؟
+              </Link>
+            </div>
+          </form>
         )}
 
         {error && (
-          <div className="p-3 bg-red-50 text-red-700 rounded-xl text-sm text-center font-bold">
+          <div className="p-3 bg-red-50 text-red-700 rounded-xl text-sm text-center font-bold border border-red-100">
             {error}
           </div>
         )}
       </div>
+
+      <style jsx>{`
+        .inp {
+          width: 100%;
+          padding: 12px 16px;
+          background: #F1F5F9;
+          border-radius: 12px;
+          border: 1px solid #E2E8F0;
+          outline: none;
+          font-size: 15px;
+          font-weight: 600;
+          color: #0F172A;
+          transition: box-shadow 0.15s;
+        }
+        .inp:focus {
+          box-shadow: 0 0 0 2px #357DED40;
+        }
+      `}</style>
     </main>
   );
 }
 
-function TabBtn({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: string; label: string }) {
+/* ──────────────────────────────────────────────────────────────────
+   Sub-components — متطابقة مع نمط register
+   ────────────────────────────────────────────────────────────────── */
+
+function TabBtn({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: string;
+  label: string;
+}) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg font-bold text-sm transition ${
-        active ? "bg-white text-[#357DED] shadow-sm" : "text-[#64748B] hover:text-[#0F172A]"
+      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition ${
+        active
+          ? "bg-gradient-to-br from-[#357DED] to-[#10B981] text-white shadow-md"
+          : "text-[#64748B] hover:text-[#0F172A]"
       }`}
     >
       <span>{icon}</span>
       <span>{label}</span>
+    </button>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden">
+      <div className="px-4 py-3 border-b border-[#F1F5F9] bg-[#F8FAFC]">
+        <span className="text-sm font-black text-[#0F172A]">{title}</span>
+      </div>
+      <div className="p-4 space-y-3">{children}</div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs font-bold text-[#475569] mb-1.5">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function SubmitButton({
+  disabled,
+  loading,
+  loadingLabel,
+  children,
+}: {
+  disabled?: boolean;
+  loading?: boolean;
+  loadingLabel: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="submit"
+      disabled={disabled}
+      className="w-full bg-gradient-to-r from-[#357DED] to-[#10B981] text-white py-4 rounded-2xl font-bold text-base shadow-lg disabled:opacity-40 active:scale-95 transition"
+    >
+      {loading ? `⏳ ${loadingLabel}` : children}
     </button>
   );
 }
