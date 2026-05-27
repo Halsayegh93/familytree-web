@@ -194,9 +194,42 @@ export function CustomReportClient({ members }: { members: Member[] }) {
     }
 
     const directChildren = childrenByFather.get(rootMember.id) ?? [];
-    return directChildren
+    const directChildrenIds = new Set(directChildren.map((c) => c.id));
+
+    // أسماء فروع إضافية (أحفاد) تظهر مباشرة في القائمة الرئيسية للاختيار
+    const EXTRA_TOP_LEVEL_NAMES = [
+      "محمدعلي حسن المحمدعلي",
+      "علي عبدالمحسن المحمدعلي",
+      "محمدحسن احمد المحمدعلي",
+      "ابراهيم(العطار) المحمدعلي",
+      "علي عبدالله المحمدعلي",
+    ];
+    const normalize = (s: string) => s.trim().replace(/\s+/g, " ");
+    const matchesAllTokens = (fullName: string, query: string) => {
+      const fn = normalize(fullName);
+      const tokens = normalize(query).split(" ").filter(Boolean);
+      return tokens.every((t) => fn.includes(t));
+    };
+    const extras: Member[] = [];
+    const usedExtraIds = new Set<string>();
+    for (const name of EXTRA_TOP_LEVEL_NAMES) {
+      const m = members.find(
+        (mm) =>
+          !directChildrenIds.has(mm.id) &&
+          !usedExtraIds.has(mm.id) &&
+          matchesAllTokens(mm.full_name ?? "", name),
+      );
+      if (m) {
+        extras.push(m);
+        usedExtraIds.add(m.id);
+      }
+    }
+
+    const sortedDirect = directChildren
       .map((c) => makeNode(c, 0))
       .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    return [...sortedDirect, ...extras.map((m) => makeNode(m, 0))];
   }, [members, rootMember]);
 
   // البحث: لو في نص، نسطّح كل المستويات ونفلتر
