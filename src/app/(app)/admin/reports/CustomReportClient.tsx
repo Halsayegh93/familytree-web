@@ -204,25 +204,49 @@ export function CustomReportClient({ members }: { members: Member[] }) {
       "ابراهيم(العطار) المحمدعلي",
       "علي عبدالله المحمدعلي",
     ];
-    const normalize = (s: string) => s.trim().replace(/\s+/g, " ");
-    const matchesAllTokens = (fullName: string, query: string) => {
-      const fn = normalize(fullName);
-      const tokens = normalize(query).split(" ").filter(Boolean);
-      return tokens.every((t) => fn.includes(t));
+
+    // تطبيع الحروف العربية (همزة، تاء مربوطة، تشكيل) ثم تجريد المسافات والأقواس
+    const normalizeArabic = (s: string) =>
+      s
+        .replace(/[أإآ]/g, "ا")
+        .replace(/ى/g, "ي")
+        .replace(/ة/g, "ه")
+        .replace(/[ًٌٍَُِّْـ]/g, "");
+    const cleanName = (s: string) =>
+      normalizeArabic(s).replace(/[()،,]/g, " ").replace(/\s+/g, " ").trim();
+    const compress = (s: string) => cleanName(s).replace(/\s+/g, "");
+
+    // المطابقة: الاسم الكامل يبدأ بكل كلمات الاستعلام عدا الأخيرة (مع تجاهل
+    // المسافات داخل الأسماء المركبة)، وينتهي بآخر كلمة (عادة "المحمدعلي").
+    const matchesName = (fullName: string, query: string) => {
+      const qTokens = cleanName(query).split(" ").filter(Boolean);
+      if (qTokens.length < 2) return false;
+      const lastQ = qTokens[qTokens.length - 1];
+      const restQ = qTokens.slice(0, -1).join(" ");
+      const fnC = compress(fullName);
+      const restQC = compress(restQ);
+      const lastQC = compress(lastQ);
+      if (!restQC || !lastQC) return false;
+      return fnC.startsWith(restQC) && fnC.endsWith(lastQC);
     };
+
     const extras: Member[] = [];
     const usedExtraIds = new Set<string>();
     for (const name of EXTRA_TOP_LEVEL_NAMES) {
-      const m = members.find(
+      const candidates = members.filter(
         (mm) =>
           !directChildrenIds.has(mm.id) &&
           !usedExtraIds.has(mm.id) &&
-          matchesAllTokens(mm.full_name ?? "", name),
+          matchesName(mm.full_name ?? "", name),
       );
-      if (m) {
-        extras.push(m);
-        usedExtraIds.add(m.id);
-      }
+      if (candidates.length === 0) continue;
+      // اختار الاسم الأقصر — الجد الفعلي، مو الأحفاد العميقة
+      candidates.sort(
+        (a, b) => (a.full_name?.length ?? 0) - (b.full_name?.length ?? 0),
+      );
+      const m = candidates[0];
+      extras.push(m);
+      usedExtraIds.add(m.id);
     }
 
     const sortedDirect = directChildren
