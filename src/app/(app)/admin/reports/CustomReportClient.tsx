@@ -230,7 +230,7 @@ export function CustomReportClient({ members }: { members: Member[] }) {
       return fnC.startsWith(restQC) && fnC.endsWith(lastQC);
     };
 
-    const extras: Member[] = [];
+    const extraNodes: BranchNode[] = [];
     const usedExtraIds = new Set<string>();
     for (const name of EXTRA_TOP_LEVEL_NAMES) {
       const candidates = members.filter(
@@ -245,7 +245,10 @@ export function CustomReportClient({ members }: { members: Member[] }) {
         (a, b) => (a.full_name?.length ?? 0) - (b.full_name?.length ?? 0),
       );
       const m = candidates[0];
-      extras.push(m);
+      const node = makeNode(m, 0);
+      // عرض الاسم بالصيغة القصيرة اللي حدّدها المستخدم بدل الاسم الكامل من DB
+      node.name = name;
+      extraNodes.push(node);
       usedExtraIds.add(m.id);
     }
 
@@ -253,7 +256,7 @@ export function CustomReportClient({ members }: { members: Member[] }) {
       .map((c) => makeNode(c, 0))
       .sort((a, b) => a.sortOrder - b.sortOrder);
 
-    return [...sortedDirect, ...extras.map((m) => makeNode(m, 0))];
+    return [...sortedDirect, ...extraNodes];
   }, [members, rootMember]);
 
   // البحث: لو في نص، نسطّح كل المستويات ونفلتر
