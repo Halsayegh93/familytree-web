@@ -63,15 +63,44 @@ export function AddProjectButton({
 
     const { error: insertErr } = await supabase.from("projects").insert(payload);
 
-    setBusy(false);
     if (insertErr) {
+      setBusy(false);
       setError("خطأ: " + insertErr.message);
-    } else {
-      reset();
-      setOpen(false);
-      router.refresh();
-      alert("✅ تم إرسال المشروع للمراجعة");
+      return;
     }
+
+    // إشعار الإدارة بطلب المشروع الجديد.
+    // ملاحظة: كان يقوم بهذا DB trigger (notify_admins_on_project_pending) لكنه
+    // أُسقط لمنع التكرار مع إشعار تطبيق iOS. الويب الآن يُرسل إشعاره بنفسه —
+    // نُدرج صفاً لكل مدير/مالك نشط (مطابقاً لسلوك الـ trigger السابق).
+    try {
+      const { data: admins } = await supabase
+        .from("profiles")
+        .select("id")
+        .in("role", ["owner", "admin"])
+        .eq("status", "active")
+        .neq("id", ownerId);
+
+      if (admins && admins.length > 0) {
+        const rows = admins.map((a) => ({
+          target_member_id: a.id,
+          title: "طلب مشروع جديد",
+          body: `${ownerName || "عضو"} يطلب إضافة: ${title.trim()}`,
+          kind: "project_request",
+          created_by: ownerId,
+          is_read: false,
+        }));
+        await supabase.from("notifications").insert(rows);
+      }
+    } catch {
+      // فشل الإشعار لا يمنع نجاح إضافة المشروع
+    }
+
+    setBusy(false);
+    reset();
+    setOpen(false);
+    router.refresh();
+    alert("✅ تم إرسال المشروع للمراجعة");
   }
 
   if (!open) {
