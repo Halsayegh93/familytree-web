@@ -53,12 +53,14 @@ export function TreeBrowser({
   members,
   canModerate = false,
   canManageRoles = false,
+  canEditMembers = false,
   women = [],
   externalSpouses = [],
 }: {
   members: Member[];
   canModerate?: boolean;
   canManageRoles?: boolean;
+  canEditMembers?: boolean;
   isHR?: boolean;
   women?: WomanMember[];
   externalSpouses?: ExternalSpouse[];
@@ -342,6 +344,7 @@ export function TreeBrowser({
             father={focused.father_id ? byId.get(focused.father_id) ?? null : null}
             canModerate={canModerate}
             canManageRoles={canManageRoles}
+            canEditMembers={canEditMembers}
             onFatherClick={() => focused.father_id && focus(focused.father_id)}
             siblings={siblings}
             siblingChildrenCount={(id) => childrenByFather.get(id)?.length ?? 0}
@@ -349,6 +352,7 @@ export function TreeBrowser({
             allMembers={members}
             directChildren={directChildren}
             onNavigate={focus}
+            wives={wives}
           />
 
           {/* ═══════ التابات (العلاقات — للمدراء فقط) ═══════ */}
@@ -366,7 +370,7 @@ export function TreeBrowser({
                 onClick={() => setTab("relations")}
                 icon="👨‍👩‍👧"
                 label="العلاقات"
-                count={wives.length + daughters.length + (mother ? 1 : 0)}
+                count={daughters.length + (mother ? 1 : 0)}
                 accent="#EC4899"
               />
             </div>
@@ -377,7 +381,6 @@ export function TreeBrowser({
             <RelationsPanel
               focused={focused}
               mother={mother}
-              wives={wives}
               sons={directChildren}
               daughters={daughters}
               internalHusbandName={internalHusbandName}
@@ -452,7 +455,6 @@ function TabButton({
 function RelationsPanel({
   focused,
   mother,
-  wives,
   sons,
   daughters,
   internalHusbandName,
@@ -462,7 +464,6 @@ function RelationsPanel({
 }: {
   focused: Member;
   mother: WomanMember | null;
-  wives: WomanMember[];
   sons: Member[];
   daughters: WomanMember[];
   internalHusbandName: (husbandId: string | null) => string | null;
@@ -471,7 +472,7 @@ function RelationsPanel({
   childrenCountOf: (id: string) => number;
 }) {
   const nothing =
-    !mother && wives.length === 0 && sons.length === 0 && daughters.length === 0;
+    !mother && sons.length === 0 && daughters.length === 0;
 
   return (
     <div className="space-y-2">
@@ -491,17 +492,6 @@ function RelationsPanel({
       {mother && (
         <Section title="الأم" count={1} icon="👩" color="#DB2777" compact>
           <WomanRow woman={mother} externals={externalByWoman.get(mother.id) ?? []} />
-        </Section>
-      )}
-
-      {/* الزوجات */}
-      {wives.length > 0 && (
-        <Section title="الزوجات" count={wives.length} icon="💍" color="#DB2777" compact>
-          <div className="space-y-1">
-            {wives.map((w) => (
-              <WomanRow key={w.id} woman={w} externals={externalByWoman.get(w.id) ?? []} />
-            ))}
-          </div>
         </Section>
       )}
 
@@ -879,6 +869,7 @@ function FocusedMemberCard({
   father,
   canModerate,
   canManageRoles,
+  canEditMembers,
   onFatherClick,
   siblings,
   siblingChildrenCount,
@@ -886,6 +877,7 @@ function FocusedMemberCard({
   allMembers,
   directChildren,
   onNavigate,
+  wives,
 }: {
   member: Member;
   generation: number;
@@ -894,6 +886,7 @@ function FocusedMemberCard({
   father: Member | null;
   canModerate: boolean;
   canManageRoles: boolean;
+  canEditMembers: boolean;
   onFatherClick: () => void;
   siblings: Member[];
   siblingChildrenCount: (id: string) => number;
@@ -901,6 +894,7 @@ function FocusedMemberCard({
   allMembers: Member[];
   directChildren: Member[];
   onNavigate: (id: string) => void;
+  wives: WomanMember[];
 }) {
   const [siblingsOpen, setSiblingsOpen] = useState(false);
   const roleColor = roleColorOf(member.role);
@@ -1048,9 +1042,205 @@ function FocusedMemberCard({
               </>
             )}
           </div>
+
+          {/* الزوجات — بجانب اسم العضو */}
+          {(wives.length > 0 || canEditMembers) && (
+            <WivesInline husbandId={member.id} wives={wives} canEdit={canEditMembers} />
+          )}
         </div>
       </div>
 
+    </div>
+  );
+}
+
+// ═══════════ Wives inline (عند اسم العضو) ═══════════
+function WivesInline({
+  husbandId,
+  wives,
+  canEdit,
+}: {
+  husbandId: string;
+  wives: WomanMember[];
+  canEdit: boolean;
+}) {
+  const [editing, setEditing] = useState<WomanMember | "new" | null>(null);
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1">
+      <span className="text-[10px] font-black text-[#DB2777] opacity-80">💍 الزوجات:</span>
+      {wives.length === 0 && !canEdit && (
+        <span className="text-[10px] text-[#94A3B8] font-bold">—</span>
+      )}
+      {wives.map((w) =>
+        canEdit ? (
+          <button
+            key={w.id}
+            onClick={() => setEditing(w)}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-[#FCE7F3] text-[#9D174D] hover:bg-[#FBCFE8] transition"
+            title="تعديل / حذف"
+          >
+            <span>{w.full_name}</span>
+            {w.is_deceased && <span>🕊️</span>}
+            <span className="opacity-60">✎</span>
+          </button>
+        ) : (
+          <span
+            key={w.id}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-[#FCE7F3] text-[#9D174D]"
+          >
+            <span>{w.full_name}</span>
+            {w.is_deceased && <span>🕊️</span>}
+          </span>
+        )
+      )}
+      {canEdit && (
+        <button
+          onClick={() => setEditing("new")}
+          className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-black bg-[#EC4899] text-white hover:opacity-90 transition"
+        >
+          ➕ زوجة
+        </button>
+      )}
+
+      {editing && (
+        <WifeModal
+          husbandId={husbandId}
+          wife={editing === "new" ? null : editing}
+          onClose={() => setEditing(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ═══════════ Wife add/edit/delete modal ═══════════
+function WifeModal({
+  husbandId,
+  wife,
+  onClose,
+}: {
+  husbandId: string;
+  wife: WomanMember | null;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [name, setName] = useState(wife?.full_name ?? "");
+  const [isDeceased, setIsDeceased] = useState(wife?.is_deceased ?? false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) {
+      setError("اسم الزوجة مطلوب");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+
+    const payload = {
+      first_name: name.trim(),
+      full_name: name.trim(),
+      husband_id: husbandId,
+      gender: "female",
+      is_deceased: isDeceased,
+    };
+
+    const { error: err } = wife
+      ? await supabase.from("women_members").update(payload).eq("id", wife.id)
+      : await supabase.from("women_members").insert(payload);
+
+    if (err) {
+      setBusy(false);
+      setError("خطأ: " + err.message);
+      return;
+    }
+    setBusy(false);
+    onClose();
+    router.refresh();
+  }
+
+  async function remove() {
+    if (!wife) return;
+    if (!confirm(`حذف الزوجة «${wife.full_name}»؟`)) return;
+    setBusy(true);
+    const { error: err } = await supabase.from("women_members").delete().eq("id", wife.id);
+    if (err) {
+      setBusy(false);
+      setError("خطأ: " + err.message);
+      return;
+    }
+    setBusy(false);
+    onClose();
+    router.refresh();
+  }
+
+  return (
+    <div className="fixed inset-0 z-[110] bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4">
+      <form
+        onSubmit={submit}
+        className="bg-white rounded-t-3xl md:rounded-3xl w-full md:max-w-sm max-h-[92vh] overflow-y-auto"
+      >
+        <div className="sticky top-0 bg-white border-b border-[#E2E8F0] px-4 py-3 flex items-center justify-between">
+          <h3 className="font-black text-[#0F172A]">
+            {wife ? "تعديل زوجة" : "➕ إضافة زوجة"}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-4 space-y-3">
+          <label className="block">
+            <span className="text-[11px] font-black text-[#64748B] mb-1 block">اسم الزوجة *</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="مثال: مريم محمد العتيبي"
+              autoFocus
+              className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#EC4899] text-sm font-semibold"
+            />
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer select-none py-1">
+            <input
+              type="checkbox"
+              checked={isDeceased}
+              onChange={(e) => setIsDeceased(e.target.checked)}
+              className="w-4 h-4 accent-[#EC4899]"
+            />
+            <span className="text-sm font-bold text-[#0F172A]">🕊️ متوفاة</span>
+          </label>
+          {error && (
+            <div className="bg-red-50 text-red-700 text-xs font-bold rounded-xl p-2.5">{error}</div>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 bg-white border-t border-[#E2E8F0] px-4 py-3 flex items-center gap-2">
+          {wife && (
+            <button
+              type="button"
+              onClick={remove}
+              disabled={busy}
+              className="h-11 px-4 rounded-xl bg-red-50 text-red-600 font-black text-sm hover:bg-red-100 disabled:opacity-50"
+            >
+              🗑️ حذف
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={busy}
+            className="flex-1 h-11 rounded-xl bg-[#EC4899] text-white font-black text-sm hover:opacity-90 disabled:opacity-50"
+          >
+            {busy ? "جارٍ الحفظ..." : wife ? "حفظ" : "إضافة"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

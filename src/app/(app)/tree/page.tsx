@@ -18,6 +18,7 @@ export default async function TreePage() {
 
   const canModerate = MODERATOR_ROLES.includes(viewer?.role ?? "");
   const canManageRoles = viewer?.role === "owner";
+  const canEditMembers = ["owner", "admin", "monitor"].includes(viewer?.role ?? "");
   const isHR = viewer?.is_hr_member === true;
 
   const { data: members } = await applyCountableFilters(
@@ -66,6 +67,7 @@ export default async function TreePage() {
           members={visible}
           canModerate={canModerate}
           canManageRoles={canManageRoles}
+          canEditMembers={canEditMembers}
           isHR={isHR}
           women={women}
           externalSpouses={externalSpouses}
