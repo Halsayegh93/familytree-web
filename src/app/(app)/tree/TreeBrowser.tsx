@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { MemberFullEditClient } from "@/app/(app)/admin/profiles/[id]/MemberFullEditClient";
@@ -594,7 +594,12 @@ function RelationsPanel({
       {/* الأم */}
       {mother && (
         <Section title="الأم" count={1} icon="👩" color="#DB2777" compact>
-          <WomanRow woman={mother} externals={externalByWoman.get(mother.id) ?? []} />
+          <WomanRow
+            woman={mother}
+            externals={externalByWoman.get(mother.id) ?? []}
+            canEdit={canEditMembers}
+            role="mother"
+          />
         </Section>
       )}
 
@@ -642,6 +647,7 @@ function RelationsPanel({
                 daughter={d}
                 internalHusbandName={internalHusbandName(d.husband_id)}
                 externals={externalByWoman.get(d.id) ?? []}
+                canEdit={canEditMembers}
               />
             ))}
             {/* بنات الطبقة الويب — قابلة للتعديل */}
@@ -1049,10 +1055,15 @@ function DaughterModal({
 function WomanRow({
   woman,
   externals,
+  canEdit = false,
+  role = "mother",
 }: {
   woman: WomanMember;
   externals: ExternalSpouse[];
+  canEdit?: boolean;
+  role?: "wife" | "mother" | "daughter";
 }) {
+  const [editing, setEditing] = useState(false);
   return (
     <div className="flex items-center gap-3 bg-[#FDF2F8]/60 border border-[#FCE7F3] rounded-xl p-2">
       <Avatar name={woman.first_name} url={woman.avatar_url} color="#DB2777" deceased={woman.is_deceased} />
@@ -1067,6 +1078,17 @@ function WomanRow({
           </div>
         )}
       </div>
+      {canEdit && (
+        <button
+          onClick={() => setEditing(true)}
+          className="flex-shrink-0 h-8 px-2.5 rounded-lg text-[11px] font-black bg-[#EFF6FF] text-[#1D4ED8] hover:bg-[#DBEAFE]"
+        >
+          ✏️ تعديل
+        </button>
+      )}
+      {editing && (
+        <WomanMemberEditModal woman={woman} role={role} onClose={() => setEditing(false)} />
+      )}
     </div>
   );
 }
@@ -1076,12 +1098,15 @@ function DaughterRow({
   daughter,
   internalHusbandName,
   externals,
+  canEdit = false,
 }: {
   daughter: WomanMember;
   internalHusbandName: string | null;
   externals: ExternalSpouse[];
+  canEdit?: boolean;
 }) {
   const ext = externals[0] ?? null;
+  const [editing, setEditing] = useState(false);
 
   return (
     <div className="bg-white border border-[#F3D9E6] rounded-xl p-2.5">
@@ -1108,15 +1133,29 @@ function DaughterRow({
             <div className="text-[11px] text-[#94A3B8] font-semibold mt-0.5">لا يوجد زوج مسجّل</div>
           )}
         </div>
-        {/* زر إدارة الزوج الخارجي — يظهر فقط إن لم يكن لها زوج من العائلة */}
-        {!internalHusbandName && (
-          <ExternalHusbandButton womanId={daughter.id} womanName={daughter.full_name} existing={ext} />
-        )}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {canEdit && (
+            <button
+              onClick={() => setEditing(true)}
+              className="h-8 px-2.5 rounded-lg text-[11px] font-black bg-[#EFF6FF] text-[#1D4ED8] hover:bg-[#DBEAFE]"
+              title="تعديل كامل (سجل حقيقي)"
+            >
+              ✏️
+            </button>
+          )}
+          {/* زر إدارة الزوج الخارجي — يظهر فقط إن لم يكن لها زوج من العائلة */}
+          {!internalHusbandName && (
+            <ExternalHusbandButton womanId={daughter.id} womanName={daughter.full_name} existing={ext} />
+          )}
+        </div>
       </div>
       {ext?.notes && (
         <div className="text-[11px] text-[#64748B] mt-1.5 pr-14 whitespace-pre-wrap">
           📝 {ext.notes}
         </div>
+      )}
+      {editing && (
+        <WomanMemberEditModal woman={daughter} role="daughter" onClose={() => setEditing(false)} />
       )}
     </div>
   );
@@ -1597,6 +1636,7 @@ function WivesInline({
   motherNamesInUse: Set<string>;
 }) {
   const [editing, setEditing] = useState<WebRelative | "new" | null>(null);
+  const [editingReal, setEditingReal] = useState<WomanMember | null>(null);
   const nothing = wives.length === 0 && webWives.length === 0;
 
   return (
@@ -1604,17 +1644,30 @@ function WivesInline({
       <span className="text-[10px] font-black text-[#DB2777] opacity-80">💍 الزوجات:</span>
       {nothing && !canEdit && <span className="text-[10px] text-[#94A3B8] font-bold">—</span>}
 
-      {/* زوجات التطبيق (women_members) — للقراءة فقط */}
-      {wives.map((w) => (
-        <span
-          key={w.id}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-[#F1F5F9] text-[#475569]"
-          title="من شجرة النساء (التطبيق)"
-        >
-          <span>{w.full_name}</span>
-          {w.is_deceased && <span>🕊️</span>}
-        </span>
-      ))}
+      {/* زوجات التطبيق (women_members) — سجل حقيقي، تعديل كامل */}
+      {wives.map((w) =>
+        canEdit ? (
+          <button
+            key={w.id}
+            onClick={() => setEditingReal(w)}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-[#EFF6FF] text-[#1D4ED8] hover:bg-[#DBEAFE] transition"
+            title="تعديل كامل (سجل حقيقي)"
+          >
+            <span>{w.full_name}</span>
+            {w.is_deceased && <span>🕊️</span>}
+            <span className="opacity-60">✎</span>
+          </button>
+        ) : (
+          <span
+            key={w.id}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-[#F1F5F9] text-[#475569]"
+            title="من شجرة النساء (التطبيق)"
+          >
+            <span>{w.full_name}</span>
+            {w.is_deceased && <span>🕊️</span>}
+          </span>
+        )
+      )}
 
       {/* زوجات الطبقة الويب — قابلة للتعديل */}
       {webWives.map((w) =>
@@ -1657,6 +1710,9 @@ function WivesInline({
           isMother={editing !== "new" && !!editing.name && motherNamesInUse.has(editing.name)}
           onClose={() => setEditing(null)}
         />
+      )}
+      {editingReal && (
+        <WomanMemberEditModal woman={editingReal} role="wife" onClose={() => setEditingReal(null)} />
       )}
     </div>
   );
@@ -1797,6 +1853,180 @@ function WifeModal({
             className="flex-1 h-11 rounded-xl bg-[#EC4899] text-white font-black text-sm hover:opacity-90 disabled:opacity-50"
           >
             {busy ? "جارٍ الحفظ..." : wife ? "حفظ" : "إضافة"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ═══════════ Woman member full editor (سجل حقيقي — women_members، يعكس بالتطبيق) ═══════════
+function WomanMemberEditModal({
+  woman,
+  role,
+  onClose,
+}: {
+  woman: WomanMember;
+  role: "wife" | "mother" | "daughter";
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [firstName, setFirstName] = useState(woman.first_name ?? "");
+  const [fullName, setFullName] = useState(woman.full_name ?? "");
+  const [birthDate, setBirthDate] = useState(woman.birth_date ?? "");
+  const [deathDate, setDeathDate] = useState(woman.death_date ?? "");
+  const [isDeceased, setIsDeceased] = useState(woman.is_deceased ?? false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(woman.avatar_url);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const roleLabel = role === "wife" ? "الزوجة" : role === "mother" ? "الأم" : "البنت";
+
+  async function uploadAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return setError("الرجاء اختيار صورة");
+    if (file.size > 5 * 1024 * 1024) return setError("حجم الصورة أكبر من 5MB");
+    setBusy(true);
+    setError(null);
+    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const path = `women/${woman.id}/${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("avatars")
+      .upload(path, file, { upsert: true, cacheControl: "3600" });
+    if (upErr) {
+      setBusy(false);
+      return setError("خطأ في الرفع: " + upErr.message);
+    }
+    const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+    setAvatarUrl(pub.publicUrl);
+    setBusy(false);
+  }
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    if (!fullName.trim()) {
+      setError("الاسم مطلوب");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const { error: err } = await supabase
+      .from("women_members")
+      .update({
+        first_name: firstName.trim() || fullName.trim(),
+        full_name: fullName.trim(),
+        birth_date: birthDate || null,
+        death_date: isDeceased ? deathDate || null : null,
+        is_deceased: isDeceased,
+        avatar_url: avatarUrl,
+      })
+      .eq("id", woman.id);
+    setBusy(false);
+    if (err) return setError("خطأ: " + err.message);
+    onClose();
+    router.refresh();
+  }
+
+  return (
+    <div className="fixed inset-0 z-[110] bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4">
+      <form
+        onSubmit={save}
+        className="bg-white rounded-t-3xl md:rounded-3xl w-full md:max-w-md max-h-[92vh] overflow-y-auto"
+      >
+        <div className="sticky top-0 z-10 bg-white border-b border-[#E2E8F0] px-4 py-3 flex items-center justify-between">
+          <h3 className="font-black text-[#0F172A]">✏️ تعديل {roleLabel}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-4 space-y-3">
+          {/* الصورة */}
+          <div className="flex flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={busy}
+              className="w-20 h-20 rounded-2xl overflow-hidden ring-4 ring-white shadow-md bg-gradient-to-br from-[#DB2777] to-[#EC4899] text-white flex items-center justify-center text-3xl font-black disabled:opacity-50"
+            >
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+              ) : (
+                (fullName || "؟").charAt(0)
+              )}
+            </button>
+            <span className="text-[10px] text-[#94A3B8] font-bold">📷 انقر لتغيير الصورة</span>
+            <input ref={fileRef} type="file" accept="image/*" onChange={uploadAvatar} className="hidden" />
+          </div>
+
+          <label className="block">
+            <span className="text-[11px] font-black text-[#64748B] mb-1 block">الاسم الكامل *</span>
+            <input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#DB2777] text-sm font-semibold"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px] font-black text-[#64748B] mb-1 block">الاسم الأول</span>
+            <input
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#DB2777] text-sm"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px] font-black text-[#64748B] mb-1 block">تاريخ الميلاد</span>
+            <input
+              type="date"
+              value={birthDate || ""}
+              onChange={(e) => setBirthDate(e.target.value)}
+              className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#DB2777] text-sm"
+            />
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer select-none py-1">
+            <input
+              type="checkbox"
+              checked={isDeceased}
+              onChange={(e) => setIsDeceased(e.target.checked)}
+              className="w-4 h-4 accent-[#DB2777]"
+            />
+            <span className="text-sm font-bold text-[#0F172A]">🕊️ متوفاة</span>
+          </label>
+          {isDeceased && (
+            <label className="block">
+              <span className="text-[11px] font-black text-[#64748B] mb-1 block">تاريخ الوفاة</span>
+              <input
+                type="date"
+                value={deathDate || ""}
+                onChange={(e) => setDeathDate(e.target.value)}
+                className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#DB2777] text-sm"
+              />
+            </label>
+          )}
+          <p className="text-[10px] text-[#B45309] font-bold bg-[#FEF3C7] rounded-lg p-2">
+            ⚠️ سجل حقيقي من شجرة النساء — التعديل يظهر بالتطبيق أيضاً.
+          </p>
+          {error && (
+            <div className="bg-red-50 text-red-700 text-xs font-bold rounded-xl p-2.5">{error}</div>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 bg-white border-t border-[#E2E8F0] px-4 py-3">
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full h-11 rounded-xl bg-[#DB2777] text-white font-black text-sm hover:opacity-90 disabled:opacity-50"
+          >
+            {busy ? "جارٍ الحفظ..." : "💾 حفظ"}
           </button>
         </div>
       </form>
