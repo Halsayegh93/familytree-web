@@ -49,6 +49,27 @@ type ExternalSpouse = {
   notes: string | null;
 };
 
+type WebRelative = {
+  id: string;
+  man_id: string;
+  kind: "wife" | "daughter" | "son";
+  name: string | null;
+  child_profile_id: string | null;
+  mother_rel_id: string | null;
+  mother_name: string | null;
+  is_deceased: boolean | null;
+  husband_type: "family" | "external" | null;
+  husband_profile_id: string | null;
+  husband_name: string | null;
+  husband_family: string | null;
+  husband_nationality: string | null;
+  husband_deceased: boolean | null;
+  notes: string | null;
+};
+
+/** خيار زوجة للاختيار كأم (من الطبقة الويب أو من women_members) */
+type WifeOption = { id: string; name: string; webId: string | null };
+
 export function TreeBrowser({
   members,
   canModerate = false,
@@ -56,6 +77,7 @@ export function TreeBrowser({
   canEditMembers = false,
   women = [],
   externalSpouses = [],
+  webRelatives = [],
 }: {
   members: Member[];
   canModerate?: boolean;
@@ -64,6 +86,7 @@ export function TreeBrowser({
   isHR?: boolean;
   women?: WomanMember[];
   externalSpouses?: ExternalSpouse[];
+  webRelatives?: WebRelative[];
 }) {
   const [search, setSearch] = useState("");
   const [focusId, setFocusId] = useState<string | null>(null);
@@ -134,6 +157,39 @@ export function TreeBrowser({
     return m;
   }, [externalSpouses]);
 
+  // ═══ فهارس الطبقة الويب (web_relatives) ═══
+  const webWivesByMan = useMemo(() => {
+    const m = new Map<string, WebRelative[]>();
+    webRelatives.forEach((r) => {
+      if (r.kind === "wife") {
+        const arr = m.get(r.man_id) ?? [];
+        arr.push(r);
+        m.set(r.man_id, arr);
+      }
+    });
+    return m;
+  }, [webRelatives]);
+
+  const webDaughtersByMan = useMemo(() => {
+    const m = new Map<string, WebRelative[]>();
+    webRelatives.forEach((r) => {
+      if (r.kind === "daughter") {
+        const arr = m.get(r.man_id) ?? [];
+        arr.push(r);
+        m.set(r.man_id, arr);
+      }
+    });
+    return m;
+  }, [webRelatives]);
+
+  const webSonMotherByChild = useMemo(() => {
+    const m = new Map<string, WebRelative>();
+    webRelatives.forEach((r) => {
+      if (r.kind === "son" && r.child_profile_id) m.set(r.child_profile_id, r);
+    });
+    return m;
+  }, [webRelatives]);
+
   // Root — أكبر جد بدون أب لكن عنده أبناء
   const root = useMemo(() => {
     const fatherIds = new Set(members.map((x) => x.father_id).filter(Boolean));
@@ -194,6 +250,35 @@ export function TreeBrowser({
     if (!focused) return [];
     return daughtersByFather.get(focused.id) ?? [];
   }, [focused, daughtersByFather]);
+
+  // زوجات/بنات الطبقة الويب للعضو المحوري
+  const webWives = useMemo<WebRelative[]>(() => {
+    if (!focused) return [];
+    return webWivesByMan.get(focused.id) ?? [];
+  }, [focused, webWivesByMan]);
+
+  const webDaughters = useMemo<WebRelative[]>(() => {
+    if (!focused) return [];
+    return webDaughtersByMan.get(focused.id) ?? [];
+  }, [focused, webDaughtersByMan]);
+
+  // كل الزوجات (women_members + الويب) كخيارات لاختيار الأم
+  const wifeOptions = useMemo<WifeOption[]>(() => {
+    const opts: WifeOption[] = [];
+    wives.forEach((w) => opts.push({ id: w.id, name: w.full_name, webId: null }));
+    webWives.forEach((w) => opts.push({ id: w.id, name: w.name ?? "", webId: w.id }));
+    return opts.filter((o) => o.name.trim());
+  }, [wives, webWives]);
+
+  // أسماء الأمهات المرتبطة بأبناء/بنات هذا العضو (للتحذير قبل حذف الزوجة)
+  const motherNamesInUse = useMemo<Set<string>>(() => {
+    const s = new Set<string>();
+    if (!focused) return s;
+    webRelatives.forEach((r) => {
+      if (r.man_id === focused.id && r.mother_name) s.add(r.mother_name);
+    });
+    return s;
+  }, [focused, webRelatives]);
 
   // عدد الأحفاد (الأبناء + الأحفاد + ...)
   const totalDescendants = useMemo(() => {
@@ -353,6 +438,10 @@ export function TreeBrowser({
             directChildren={directChildren}
             onNavigate={focus}
             wives={wives}
+            webWives={webWives}
+            wifeOptions={wifeOptions}
+            sonMotherByChild={webSonMotherByChild}
+            motherNamesInUse={motherNamesInUse}
           />
 
           {/* ═══════ التابات (العلاقات — للمدراء فقط) ═══════ */}
@@ -370,7 +459,7 @@ export function TreeBrowser({
                 onClick={() => setTab("relations")}
                 icon="👨‍👩‍👧"
                 label="العلاقات"
-                count={daughters.length + (mother ? 1 : 0)}
+                count={daughters.length + webDaughters.length + (mother ? 1 : 0)}
                 accent="#EC4899"
               />
             </div>
@@ -383,8 +472,12 @@ export function TreeBrowser({
               mother={mother}
               sons={directChildren}
               daughters={daughters}
+              webDaughters={webDaughters}
+              wifeOptions={wifeOptions}
+              allMembers={members}
               internalHusbandName={internalHusbandName}
               externalByWoman={externalByWoman}
+              canEditMembers={canEditMembers}
               onFocus={focus}
               childrenCountOf={(id) => childrenByFather.get(id)?.length ?? 0}
             />
@@ -457,8 +550,12 @@ function RelationsPanel({
   mother,
   sons,
   daughters,
+  webDaughters,
+  wifeOptions,
+  allMembers,
   internalHusbandName,
   externalByWoman,
+  canEditMembers,
   onFocus,
   childrenCountOf,
 }: {
@@ -466,19 +563,25 @@ function RelationsPanel({
   mother: WomanMember | null;
   sons: Member[];
   daughters: WomanMember[];
+  webDaughters: WebRelative[];
+  wifeOptions: WifeOption[];
+  allMembers: Member[];
   internalHusbandName: (husbandId: string | null) => string | null;
   externalByWoman: Map<string, ExternalSpouse[]>;
+  canEditMembers: boolean;
   onFocus: (id: string) => void;
   childrenCountOf: (id: string) => number;
 }) {
+  const [addingDaughter, setAddingDaughter] = useState(false);
+  const totalDaughters = daughters.length + webDaughters.length;
   const nothing =
-    !mother && sons.length === 0 && daughters.length === 0;
+    !mother && sons.length === 0 && totalDaughters === 0 && !canEditMembers;
 
   return (
     <div className="space-y-2">
       <div className="bg-[#FDF2F8] border border-[#FBCFE8] rounded-2xl px-3 py-2 text-[11px] text-[#9D174D] font-bold flex items-center gap-1.5">
-        <span>💠</span>
-        <span>لوحة العلاقات — خاصة بالويب والمدراء فقط. تشمل الأم والزوجات والأبناء والبنات والأزواج من خارج العائلة.</span>
+        <span>🔒</span>
+        <span>لوحة العلاقات — خاصة بالموقع فقط، لا تظهر بتطبيق الآيفون/الأندرويد. تشمل الأم والأبناء والبنات وأزواجهن.</span>
       </div>
 
       {nothing && (
@@ -512,10 +615,27 @@ function RelationsPanel({
         </Section>
       )}
 
-      {/* البنات + الزوج الخارجي */}
-      {daughters.length > 0 && (
-        <Section title="البنات" count={daughters.length} icon="👧" color="#EC4899" compact>
+      {/* البنات */}
+      {(totalDaughters > 0 || canEditMembers) && (
+        <Section
+          title="البنات"
+          count={totalDaughters}
+          icon="👧"
+          color="#EC4899"
+          compact
+          action={
+            canEditMembers ? (
+              <button
+                onClick={() => setAddingDaughter(true)}
+                className="text-[10px] font-black text-white bg-[#EC4899] px-2 py-0.5 rounded-full hover:opacity-90"
+              >
+                ➕ إضافة بنت
+              </button>
+            ) : undefined
+          }
+        >
           <div className="space-y-1.5">
+            {/* بنات التطبيق (women_members) — عرض فقط */}
             {daughters.map((d) => (
               <DaughterRow
                 key={d.id}
@@ -524,12 +644,403 @@ function RelationsPanel({
                 externals={externalByWoman.get(d.id) ?? []}
               />
             ))}
+            {/* بنات الطبقة الويب — قابلة للتعديل */}
+            {webDaughters.map((d) => (
+              <WebDaughterRow
+                key={d.id}
+                daughter={d}
+                manId={focused.id}
+                wifeOptions={wifeOptions}
+                allMembers={allMembers}
+                canEdit={canEditMembers}
+              />
+            ))}
+            {totalDaughters === 0 && (
+              <p className="text-center text-[#94A3B8] text-xs py-2 font-bold">لا توجد بنات مسجّلة</p>
+            )}
           </div>
         </Section>
       )}
-      <div className="text-[10px] text-[#94A3B8] text-center pt-1">
-        {focused.full_name}
+
+      {addingDaughter && (
+        <DaughterModal
+          manId={focused.id}
+          daughter={null}
+          wifeOptions={wifeOptions}
+          allMembers={allMembers}
+          onClose={() => setAddingDaughter(false)}
+        />
+      )}
+
+      <div className="text-[10px] text-[#94A3B8] text-center pt-1">{focused.full_name}</div>
+    </div>
+  );
+}
+
+// صف بنت (طبقة ويب) — اسم + أم + زوج (عائلة/خارجي) + تعديل/حذف
+function WebDaughterRow({
+  daughter,
+  manId,
+  wifeOptions,
+  allMembers,
+  canEdit,
+}: {
+  daughter: WebRelative;
+  manId: string;
+  wifeOptions: WifeOption[];
+  allMembers: Member[];
+  canEdit: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const husbandName =
+    daughter.husband_type === "family"
+      ? allMembers.find((m) => m.id === daughter.husband_profile_id)?.full_name ?? "—"
+      : daughter.husband_type === "external"
+      ? [daughter.husband_name, daughter.husband_family, daughter.husband_nationality]
+          .filter(Boolean)
+          .join(" ")
+      : null;
+
+  return (
+    <div className="bg-white border border-[#F3D9E6] rounded-xl p-2.5">
+      <div className="flex items-center gap-3">
+        <Avatar name={daughter.name ?? "؟"} url={null} color="#EC4899" deceased={daughter.is_deceased} />
+        <div className="flex-1 min-w-0">
+          <div className="font-black text-sm text-[#0F172A] truncate">
+            {daughter.name}
+            {daughter.is_deceased && <span className="mr-1 text-[11px] text-[#6B7B8D]">🕊️</span>}
+          </div>
+          {daughter.mother_name && (
+            <div className="text-[11px] text-[#DB2777] font-bold mt-0.5">👩 الأم: {daughter.mother_name}</div>
+          )}
+          {husbandName ? (
+            <div
+              className={`text-[11px] font-bold mt-0.5 ${
+                daughter.husband_type === "family" ? "text-[#357DED]" : "text-[#9D174D]"
+              }`}
+            >
+              {daughter.husband_type === "family" ? "💍 الزوج: " : "🌍 الزوج (خارج العائلة): "}
+              {husbandName}
+              {daughter.husband_type === "family" && <span className="text-[#94A3B8]"> (من العائلة)</span>}
+              {daughter.husband_deceased ? " 🕊️" : ""}
+            </div>
+          ) : (
+            <div className="text-[11px] text-[#94A3B8] font-semibold mt-0.5">لا يوجد زوج مسجّل</div>
+          )}
+        </div>
+        {canEdit && (
+          <button
+            onClick={() => setEditing(true)}
+            className="flex-shrink-0 h-8 px-2.5 rounded-lg text-[11px] font-black bg-[#FCE7F3] text-[#9D174D] hover:bg-[#FBCFE8]"
+          >
+            ✏️ تعديل
+          </button>
+        )}
       </div>
+      {daughter.notes && (
+        <div className="text-[11px] text-[#64748B] mt-1.5 pr-14 whitespace-pre-wrap">📝 {daughter.notes}</div>
+      )}
+      {editing && (
+        <DaughterModal
+          manId={manId}
+          daughter={daughter}
+          wifeOptions={wifeOptions}
+          allMembers={allMembers}
+          onClose={() => setEditing(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ═══════════ Daughter add/edit/delete modal (طبقة ويب) ═══════════
+function DaughterModal({
+  manId,
+  daughter,
+  wifeOptions,
+  allMembers,
+  onClose,
+}: {
+  manId: string;
+  daughter: WebRelative | null;
+  wifeOptions: WifeOption[];
+  allMembers: Member[];
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [name, setName] = useState(daughter?.name ?? "");
+  const [isDeceased, setIsDeceased] = useState(daughter?.is_deceased ?? false);
+  const [motherName, setMotherName] = useState(daughter?.mother_name ?? "");
+  const [husbandType, setHusbandType] = useState<"" | "family" | "external">(
+    daughter?.husband_type ?? ""
+  );
+  const [husbandProfileId, setHusbandProfileId] = useState<string | null>(
+    daughter?.husband_profile_id ?? null
+  );
+  const [husbandSearch, setHusbandSearch] = useState("");
+  const [husbandName, setHusbandName] = useState(daughter?.husband_name ?? "");
+  const [husbandFamily, setHusbandFamily] = useState(daughter?.husband_family ?? "");
+  const [husbandNationality, setHusbandNationality] = useState(daughter?.husband_nationality ?? "");
+  const [husbandDeceased, setHusbandDeceased] = useState(daughter?.husband_deceased ?? false);
+  const [notes, setNotes] = useState(daughter?.notes ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const husbandMatches = useMemo(() => {
+    if (!husbandSearch.trim()) return [];
+    const q = husbandSearch.toLowerCase();
+    return allMembers.filter((m) => m.full_name.toLowerCase().includes(q)).slice(0, 8);
+  }, [husbandSearch, allMembers]);
+  const husbandChosenName = husbandProfileId
+    ? allMembers.find((m) => m.id === husbandProfileId)?.full_name
+    : null;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) {
+      setError("اسم البنت مطلوب");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+
+    const payload: Record<string, any> = {
+      man_id: manId,
+      kind: "daughter",
+      name: name.trim(),
+      is_deceased: isDeceased,
+      mother_name: motherName.trim() || null,
+      husband_type: husbandType || null,
+      husband_profile_id: husbandType === "family" ? husbandProfileId : null,
+      husband_name: husbandType === "external" ? husbandName.trim() || null : null,
+      husband_family: husbandType === "external" ? husbandFamily.trim() || null : null,
+      husband_nationality: husbandType === "external" ? husbandNationality.trim() || null : null,
+      husband_deceased: husbandType === "external" ? husbandDeceased : false,
+      notes: notes.trim() || null,
+    };
+
+    const { error: err } = daughter
+      ? await supabase.from("web_relatives").update(payload).eq("id", daughter.id)
+      : await supabase.from("web_relatives").insert(payload);
+
+    if (err) {
+      setBusy(false);
+      setError("خطأ: " + err.message);
+      return;
+    }
+    setBusy(false);
+    onClose();
+    router.refresh();
+  }
+
+  async function remove() {
+    if (!daughter) return;
+    if (!confirm(`حذف البنت «${daughter.name}»؟`)) return;
+    setBusy(true);
+    const { error: err } = await supabase.from("web_relatives").delete().eq("id", daughter.id);
+    if (err) {
+      setBusy(false);
+      setError("خطأ: " + err.message);
+      return;
+    }
+    setBusy(false);
+    onClose();
+    router.refresh();
+  }
+
+  return (
+    <div className="fixed inset-0 z-[110] bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4">
+      <form
+        onSubmit={submit}
+        className="bg-white rounded-t-3xl md:rounded-3xl w-full md:max-w-md max-h-[92vh] overflow-y-auto"
+      >
+        <div className="sticky top-0 z-10 bg-white border-b border-[#E2E8F0] px-4 py-3 flex items-center justify-between">
+          <h3 className="font-black text-[#0F172A]">{daughter ? "تعديل بنت" : "➕ إضافة بنت"}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-4 space-y-3">
+          <label className="block">
+            <span className="text-[11px] font-black text-[#64748B] mb-1 block">اسم البنت *</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="اسم البنت"
+              autoFocus
+              className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#EC4899] text-sm font-semibold"
+            />
+          </label>
+
+          {/* الأم */}
+          <label className="block">
+            <span className="text-[11px] font-black text-[#64748B] mb-1 block">الأم (اختياري)</span>
+            <select
+              value={motherName}
+              onChange={(e) => setMotherName(e.target.value)}
+              className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#EC4899] text-sm font-bold"
+            >
+              <option value="">— اختر الأم —</option>
+              {wifeOptions.map((w) => (
+                <option key={w.id} value={w.name}>{w.name}</option>
+              ))}
+            </select>
+            {wifeOptions.length === 0 && (
+              <span className="text-[10px] text-[#94A3B8] font-bold">أضف زوجة أولاً لتظهر هنا كأم</span>
+            )}
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer select-none py-1">
+            <input
+              type="checkbox"
+              checked={isDeceased}
+              onChange={(e) => setIsDeceased(e.target.checked)}
+              className="w-4 h-4 accent-[#EC4899]"
+            />
+            <span className="text-sm font-bold text-[#0F172A]">🕊️ متوفاة</span>
+          </label>
+
+          {/* الزوج */}
+          <div className="border-t border-[#F1F5F9] pt-3">
+            <span className="text-[11px] font-black text-[#64748B] mb-1.5 block">الزوج</span>
+            <div className="flex gap-1.5 mb-2">
+              {([
+                { v: "", l: "بدون" },
+                { v: "family", l: "من العائلة" },
+                { v: "external", l: "خارج العائلة" },
+              ] as const).map((o) => (
+                <button
+                  key={o.v}
+                  type="button"
+                  onClick={() => setHusbandType(o.v)}
+                  className={`flex-1 h-9 rounded-lg text-xs font-black transition ${
+                    husbandType === o.v ? "bg-[#EC4899] text-white" : "bg-[#F1F5F9] text-[#64748B]"
+                  }`}
+                >
+                  {o.l}
+                </button>
+              ))}
+            </div>
+
+            {husbandType === "family" && (
+              <div className="relative">
+                {husbandChosenName ? (
+                  <div className="flex items-center justify-between px-3 py-2.5 bg-[#EFF6FF] rounded-xl">
+                    <span className="font-bold text-sm text-[#0F172A] truncate">{husbandChosenName}</span>
+                    <button
+                      type="button"
+                      onClick={() => setHusbandProfileId(null)}
+                      className="text-[#EF4444] text-xs font-bold flex-shrink-0 mr-2"
+                    >
+                      تغيير
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      value={husbandSearch}
+                      onChange={(e) => setHusbandSearch(e.target.value)}
+                      placeholder="ابحث عن الزوج من العائلة..."
+                      className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#357DED] text-sm"
+                    />
+                    {husbandMatches.length > 0 && (
+                      <div className="absolute top-full mt-1 right-0 left-0 bg-white rounded-xl border border-[#E2E8F0] z-20 max-h-48 overflow-y-auto shadow-xl">
+                        {husbandMatches.map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              setHusbandProfileId(m.id);
+                              setHusbandSearch("");
+                            }}
+                            className="w-full text-right px-3 py-2 hover:bg-[#F1F5F9] border-b border-[#E2E8F0] last:border-0 text-sm font-bold text-[#0F172A]"
+                          >
+                            {m.full_name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {husbandType === "external" && (
+              <div className="space-y-2">
+                <input
+                  value={husbandName}
+                  onChange={(e) => setHusbandName(e.target.value)}
+                  placeholder="اسم الزوج"
+                  className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#EC4899] text-sm"
+                />
+                <input
+                  value={husbandFamily}
+                  onChange={(e) => setHusbandFamily(e.target.value)}
+                  placeholder="العائلة / القبيلة"
+                  className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#EC4899] text-sm"
+                />
+                <input
+                  value={husbandNationality}
+                  onChange={(e) => setHusbandNationality(e.target.value)}
+                  placeholder="الجنسية"
+                  className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#EC4899] text-sm"
+                />
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={husbandDeceased}
+                    onChange={(e) => setHusbandDeceased(e.target.checked)}
+                    className="w-4 h-4 accent-[#EC4899]"
+                  />
+                  <span className="text-sm font-bold text-[#0F172A]">🕊️ الزوج متوفى</span>
+                </label>
+              </div>
+            )}
+          </div>
+
+          <label className="block">
+            <span className="text-[11px] font-black text-[#64748B] mb-1 block">ملاحظات</span>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              placeholder="أي معلومات إضافية..."
+              className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#EC4899] text-sm resize-none"
+            />
+          </label>
+
+          <p className="text-[10px] text-[#94A3B8] font-bold">🔒 خاص بالموقع — لا يظهر بتطبيق الآيفون/الأندرويد</p>
+          {error && (
+            <div className="bg-red-50 text-red-700 text-xs font-bold rounded-xl p-2.5">{error}</div>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 bg-white border-t border-[#E2E8F0] px-4 py-3 flex items-center gap-2">
+          {daughter && (
+            <button
+              type="button"
+              onClick={remove}
+              disabled={busy}
+              className="h-11 px-4 rounded-xl bg-red-50 text-red-600 font-black text-sm hover:bg-red-100 disabled:opacity-50"
+            >
+              🗑️ حذف
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={busy}
+            className="flex-1 h-11 rounded-xl bg-[#EC4899] text-white font-black text-sm hover:opacity-90 disabled:opacity-50"
+          >
+            {busy ? "جارٍ الحفظ..." : daughter ? "حفظ" : "إضافة"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -878,6 +1389,10 @@ function FocusedMemberCard({
   directChildren,
   onNavigate,
   wives,
+  webWives,
+  wifeOptions,
+  sonMotherByChild,
+  motherNamesInUse,
 }: {
   member: Member;
   generation: number;
@@ -895,6 +1410,10 @@ function FocusedMemberCard({
   directChildren: Member[];
   onNavigate: (id: string) => void;
   wives: WomanMember[];
+  webWives: WebRelative[];
+  wifeOptions: WifeOption[];
+  sonMotherByChild: Map<string, WebRelative>;
+  motherNamesInUse: Set<string>;
 }) {
   const [siblingsOpen, setSiblingsOpen] = useState(false);
   const roleColor = roleColorOf(member.role);
@@ -927,6 +1446,8 @@ function FocusedMemberCard({
                 allMembers={allMembers}
                 childrenList={directChildren}
                 onNavigate={onNavigate}
+                wifeOptions={wifeOptions}
+                sonMotherByChild={sonMotherByChild}
               />
             </div>
           ) : (
@@ -1045,7 +1566,13 @@ function FocusedMemberCard({
 
           {/* الزوجات — بجانب اسم العضو */}
           {(wives.length > 0 || canEditMembers) && (
-            <WivesInline husbandId={member.id} wives={wives} canEdit={canEditMembers} />
+            <WivesInline
+              husbandId={member.id}
+              wives={wives}
+              webWives={webWives}
+              canEdit={canEditMembers}
+              motherNamesInUse={motherNamesInUse}
+            />
           )}
         </div>
       </div>
@@ -1055,24 +1582,42 @@ function FocusedMemberCard({
 }
 
 // ═══════════ Wives inline (عند اسم العضو) ═══════════
+// يعرض زوجات women_members (من التطبيق — للقراءة) + زوجات الطبقة الويب (قابلة للتعديل)
 function WivesInline({
   husbandId,
   wives,
+  webWives,
   canEdit,
+  motherNamesInUse,
 }: {
   husbandId: string;
   wives: WomanMember[];
+  webWives: WebRelative[];
   canEdit: boolean;
+  motherNamesInUse: Set<string>;
 }) {
-  const [editing, setEditing] = useState<WomanMember | "new" | null>(null);
+  const [editing, setEditing] = useState<WebRelative | "new" | null>(null);
+  const nothing = wives.length === 0 && webWives.length === 0;
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1">
       <span className="text-[10px] font-black text-[#DB2777] opacity-80">💍 الزوجات:</span>
-      {wives.length === 0 && !canEdit && (
-        <span className="text-[10px] text-[#94A3B8] font-bold">—</span>
-      )}
-      {wives.map((w) =>
+      {nothing && !canEdit && <span className="text-[10px] text-[#94A3B8] font-bold">—</span>}
+
+      {/* زوجات التطبيق (women_members) — للقراءة فقط */}
+      {wives.map((w) => (
+        <span
+          key={w.id}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-[#F1F5F9] text-[#475569]"
+          title="من شجرة النساء (التطبيق)"
+        >
+          <span>{w.full_name}</span>
+          {w.is_deceased && <span>🕊️</span>}
+        </span>
+      ))}
+
+      {/* زوجات الطبقة الويب — قابلة للتعديل */}
+      {webWives.map((w) =>
         canEdit ? (
           <button
             key={w.id}
@@ -1080,7 +1625,8 @@ function WivesInline({
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-[#FCE7F3] text-[#9D174D] hover:bg-[#FBCFE8] transition"
             title="تعديل / حذف"
           >
-            <span>{w.full_name}</span>
+            <span>{w.name}</span>
+            {w.name && motherNamesInUse.has(w.name) && <span title="مرتبطة كأم لأبناء">👶</span>}
             {w.is_deceased && <span>🕊️</span>}
             <span className="opacity-60">✎</span>
           </button>
@@ -1089,11 +1635,12 @@ function WivesInline({
             key={w.id}
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-[#FCE7F3] text-[#9D174D]"
           >
-            <span>{w.full_name}</span>
+            <span>{w.name}</span>
             {w.is_deceased && <span>🕊️</span>}
           </span>
         )
       )}
+
       {canEdit && (
         <button
           onClick={() => setEditing("new")}
@@ -1107,6 +1654,7 @@ function WivesInline({
         <WifeModal
           husbandId={husbandId}
           wife={editing === "new" ? null : editing}
+          isMother={editing !== "new" && !!editing.name && motherNamesInUse.has(editing.name)}
           onClose={() => setEditing(null)}
         />
       )}
@@ -1114,19 +1662,21 @@ function WivesInline({
   );
 }
 
-// ═══════════ Wife add/edit/delete modal ═══════════
+// ═══════════ Wife add/edit/delete modal (طبقة ويب — web_relatives) ═══════════
 function WifeModal({
   husbandId,
   wife,
+  isMother,
   onClose,
 }: {
   husbandId: string;
-  wife: WomanMember | null;
+  wife: WebRelative | null;
+  isMother: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [name, setName] = useState(wife?.full_name ?? "");
+  const [name, setName] = useState(wife?.name ?? "");
   const [isDeceased, setIsDeceased] = useState(wife?.is_deceased ?? false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1141,16 +1691,15 @@ function WifeModal({
     setError(null);
 
     const payload = {
-      first_name: name.trim(),
-      full_name: name.trim(),
-      husband_id: husbandId,
-      gender: "female",
+      man_id: husbandId,
+      kind: "wife",
+      name: name.trim(),
       is_deceased: isDeceased,
     };
 
     const { error: err } = wife
-      ? await supabase.from("women_members").update(payload).eq("id", wife.id)
-      : await supabase.from("women_members").insert(payload);
+      ? await supabase.from("web_relatives").update(payload).eq("id", wife.id)
+      : await supabase.from("web_relatives").insert(payload);
 
     if (err) {
       setBusy(false);
@@ -1164,9 +1713,12 @@ function WifeModal({
 
   async function remove() {
     if (!wife) return;
-    if (!confirm(`حذف الزوجة «${wife.full_name}»؟`)) return;
+    const msg = isMother
+      ? `«${wife.name}» مرتبطة كأم لأبناء/بنات. حذف الزوجة لن يحذف الأبناء وسيبقى اسم الأم مسجّلاً عندهم. متابعة الحذف؟`
+      : `حذف الزوجة «${wife.name}»؟`;
+    if (!confirm(msg)) return;
     setBusy(true);
-    const { error: err } = await supabase.from("women_members").delete().eq("id", wife.id);
+    const { error: err } = await supabase.from("web_relatives").delete().eq("id", wife.id);
     if (err) {
       setBusy(false);
       setError("خطأ: " + err.message);
@@ -1216,6 +1768,13 @@ function WifeModal({
             />
             <span className="text-sm font-bold text-[#0F172A]">🕊️ متوفاة</span>
           </label>
+          {isMother && (
+            <div className="bg-[#FEF3C7] border border-[#FCD34D] text-[#92400E] text-[11px] font-bold rounded-xl p-2.5 flex items-start gap-1.5">
+              <span>👶</span>
+              <span>هذه الزوجة مرتبطة كأم لأبناء/بنات. عند الحذف يبقى اسمها مسجّلاً عند الأبناء.</span>
+            </div>
+          )}
+          <p className="text-[10px] text-[#94A3B8] font-bold">🔒 خاص بالموقع — لا يظهر بتطبيق الآيفون/الأندرويد</p>
           {error && (
             <div className="bg-red-50 text-red-700 text-xs font-bold rounded-xl p-2.5">{error}</div>
           )}
@@ -1276,6 +1835,7 @@ function Section({
   icon,
   color,
   compact,
+  action,
   children,
 }: {
   title: string;
@@ -1283,6 +1843,7 @@ function Section({
   icon: string;
   color: string;
   compact?: boolean;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -1303,6 +1864,7 @@ function Section({
             {count}
           </span>
         </div>
+        {action}
       </div>
       <div className={compact ? "p-1.5" : "p-2"}>{children}</div>
     </div>

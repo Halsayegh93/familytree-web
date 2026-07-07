@@ -34,9 +34,10 @@ export default async function TreePage() {
   // نجلب نساء العائلة والأزواج الخارجيين فقط عند الحاجة لتوفير الحِمل.
   let women: WomanRow[] = [];
   let externalSpouses: ExternalSpouseRow[] = [];
+  let webRelatives: WebRelativeRow[] = [];
 
   if (canModerate) {
-    const [{ data: w }, { data: ext }] = await Promise.all([
+    const [{ data: w }, { data: ext }, { data: wr }] = await Promise.all([
       supabase
         .from("women_members")
         .select("id, first_name, full_name, parent_id, mother_id, husband_id, gender, is_deceased, birth_date, death_date, avatar_url, sort_order")
@@ -44,9 +45,14 @@ export default async function TreePage() {
       supabase
         .from("external_spouses")
         .select("id, woman_id, first_name, full_name, family_name, nationality, is_deceased, notes"),
+      supabase
+        .from("web_relatives")
+        .select("id, man_id, kind, name, child_profile_id, mother_rel_id, mother_name, is_deceased, husband_type, husband_profile_id, husband_name, husband_family, husband_nationality, husband_deceased, notes")
+        .limit(10000),
     ]);
     women = (w ?? []) as WomanRow[];
     externalSpouses = (ext ?? []) as ExternalSpouseRow[];
+    webRelatives = (wr ?? []) as WebRelativeRow[];
   }
 
   return (
@@ -71,6 +77,7 @@ export default async function TreePage() {
           isHR={isHR}
           women={women}
           externalSpouses={externalSpouses}
+          webRelatives={webRelatives}
         />
       </main>
     </PageBackground>
@@ -100,5 +107,23 @@ type ExternalSpouseRow = {
   family_name: string | null;
   nationality: string | null;
   is_deceased: boolean | null;
+  notes: string | null;
+};
+
+type WebRelativeRow = {
+  id: string;
+  man_id: string;
+  kind: "wife" | "daughter" | "son";
+  name: string | null;
+  child_profile_id: string | null;
+  mother_rel_id: string | null;
+  mother_name: string | null;
+  is_deceased: boolean | null;
+  husband_type: "family" | "external" | null;
+  husband_profile_id: string | null;
+  husband_name: string | null;
+  husband_family: string | null;
+  husband_nationality: string | null;
+  husband_deceased: boolean | null;
   notes: string | null;
 };

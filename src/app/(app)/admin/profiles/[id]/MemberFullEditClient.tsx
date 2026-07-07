@@ -14,6 +14,8 @@ type ChildLite = {
   is_deceased: boolean | null;
   sort_order: number | null;
 };
+type WifeOpt = { id: string; name: string; webId: string | null };
+type SonMother = { mother_name: string | null };
 
 export function MemberFullEditClient({
   member,
@@ -22,6 +24,8 @@ export function MemberFullEditClient({
   allMembers,
   childrenList,
   onNavigate,
+  wifeOptions,
+  sonMotherByChild,
 }: {
   member: any;
   canManageRoles: boolean;
@@ -32,6 +36,10 @@ export function MemberFullEditClient({
   childrenList?: ChildLite[];
   /** الانتقال لعضو آخر داخل الشجرة */
   onNavigate?: (id: string) => void;
+  /** زوجات العضو كخيارات لاختيار أم الابن (طبقة ويب) */
+  wifeOptions?: WifeOpt[];
+  /** خريطة ابن → أمه (طبقة ويب) */
+  sonMotherByChild?: ReadonlyMap<string, SonMother>;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -257,6 +265,8 @@ export function MemberFullEditClient({
               childrenList={childrenList!}
               onNavigate={onNavigate}
               onClose={() => setOpen(false)}
+              wifeOptions={wifeOptions ?? []}
+              sonMotherByChild={sonMotherByChild}
             />
           )}
 
@@ -484,17 +494,22 @@ function ChildrenSection({
   childrenList,
   onNavigate,
   onClose,
+  wifeOptions,
+  sonMotherByChild,
 }: {
   parent: any;
   parentFullName: string;
   childrenList: ChildLite[];
   onNavigate?: (id: string) => void;
   onClose: () => void;
+  wifeOptions: WifeOpt[];
+  sonMotherByChild?: ReadonlyMap<string, SonMother>;
 }) {
   const supabase = createClient();
   const router = useRouter();
   const [adding, setAdding] = useState(false);
   const [sonName, setSonName] = useState("");
+  const [motherName, setMotherName] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -506,18 +521,38 @@ function ChildrenSection({
     setErr(null);
 
     const maxSort = childrenList.reduce((mx, c) => Math.max(mx, c.sort_order ?? 0), 0);
-    const { error } = await supabase.from("profiles").insert({
-      first_name: first,
-      full_name: `${first} ${parentFullName}`.trim(),
-      father_id: parent.id,
-      role: "member",
-      status: "active",
-      gender: "male",
-      sort_order: maxSort + 1,
-    });
+    const { data: inserted, error } = await supabase
+      .from("profiles")
+      .insert({
+        first_name: first,
+        full_name: `${first} ${parentFullName}`.trim(),
+        father_id: parent.id,
+        role: "member",
+        status: "active",
+        gender: "male",
+        sort_order: maxSort + 1,
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      setBusy(false);
+      return setErr("خطأ: " + error.message);
+    }
+
+    // ربط الأم (طبقة ويب — لا يظهر بالتطبيق)
+    if (motherName.trim() && inserted?.id) {
+      await supabase.from("web_relatives").insert({
+        man_id: parent.id,
+        kind: "son",
+        child_profile_id: inserted.id,
+        mother_name: motherName.trim(),
+      });
+    }
+
     setBusy(false);
-    if (error) return setErr("خطأ: " + error.message);
     setSonName("");
+    setMotherName("");
     setAdding(false);
     router.refresh();
   }
@@ -526,7 +561,7 @@ function ChildrenSection({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-bold text-[#64748B] uppercase tracking-wider">
-          الأبناء {childrenList.length > 0 && `· ${childrenList.length}`}
+          الأبناء (ذكور) {childrenList.length > 0 && `· ${childrenList.length}`}
         </h3>
         <button
           type="button"
@@ -552,6 +587,23 @@ function ChildrenSection({
               الاسم الكامل: {sonName.trim()} {parentFullName}
             </p>
           )}
+          {/* اختيار الأم (طبقة ويب) */}
+          <div>
+            <span className="text-[10px] font-black text-[#64748B] mb-1 block">الأم (اختياري)</span>
+            <select
+              value={motherName}
+              onChange={(e) => setMotherName(e.target.value)}
+              className="w-full px-3 py-2.5 bg-white rounded-lg outline-none focus:ring-2 focus:ring-[#EC4899] text-sm font-bold"
+            >
+              <option value="">— اختر الأم —</option>
+              {wifeOptions.map((w) => (
+                <option key={w.id} value={w.name}>{w.name}</option>
+              ))}
+            </select>
+            {wifeOptions.length === 0 && (
+              <span className="text-[10px] text-[#94A3B8] font-bold">أضف زوجة أولاً لتظهر هنا كأم</span>
+            )}
+          </div>
           <button
             type="button"
             onClick={addSon}
@@ -566,33 +618,43 @@ function ChildrenSection({
 
       {childrenList.length > 0 && (
         <div className="space-y-1">
-          {childrenList.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => {
-                if (onNavigate) {
-                  onClose();
-                  onNavigate(c.id);
-                }
-              }}
-              className="w-full flex items-center gap-2.5 p-2 bg-[#F8FAFC] rounded-xl hover:bg-[#EFF6FF] transition text-right border border-[#E2E8F0]"
-            >
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#357DED] to-[#10B981] text-white flex items-center justify-center font-black text-sm overflow-hidden flex-shrink-0">
-                {c.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.avatar_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  c.first_name.charAt(0)
-                )}
-              </div>
-              <span className="flex-1 min-w-0 font-bold text-sm text-[#0F172A] truncate">
-                {c.first_name}
-                {c.is_deceased && <span className="mr-1 text-[11px]">🕊️</span>}
-              </span>
-              {onNavigate && <span className="text-[#94A3B8] text-xs flex-shrink-0">تعديل ←</span>}
-            </button>
-          ))}
+          {childrenList.map((c) => {
+            const motherOfChild = sonMotherByChild?.get(c.id)?.mother_name ?? null;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => {
+                  if (onNavigate) {
+                    onClose();
+                    onNavigate(c.id);
+                  }
+                }}
+                className="w-full flex items-center gap-2.5 p-2 bg-[#F8FAFC] rounded-xl hover:bg-[#EFF6FF] transition text-right border border-[#E2E8F0]"
+              >
+                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#357DED] to-[#10B981] text-white flex items-center justify-center font-black text-sm overflow-hidden flex-shrink-0">
+                  {c.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={c.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    c.first_name.charAt(0)
+                  )}
+                </div>
+                <span className="flex-1 min-w-0 text-right">
+                  <span className="block font-bold text-sm text-[#0F172A] truncate">
+                    {c.first_name}
+                    {c.is_deceased && <span className="mr-1 text-[11px]">🕊️</span>}
+                  </span>
+                  {motherOfChild && (
+                    <span className="block text-[10px] font-black text-[#DB2777] truncate">
+                      👩 الأم: {motherOfChild}
+                    </span>
+                  )}
+                </span>
+                {onNavigate && <span className="text-[#94A3B8] text-xs flex-shrink-0">تعديل ←</span>}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
