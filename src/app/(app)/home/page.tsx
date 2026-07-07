@@ -67,7 +67,7 @@ export default async function HomePage() {
 
   return (
     <PageBackground theme="home">
-      <main className="max-w-6xl mx-auto px-4 md:px-6 py-5 md:py-7 space-y-5">
+      <main className="max-w-6xl mx-auto px-4 md:px-6 py-5 md:py-8 space-y-6">
         {/* ═══════ Hero ═══════ */}
         <HeroBanner
           firstName={profile?.first_name ?? "بك"}
@@ -75,6 +75,7 @@ export default async function HomePage() {
           role={profile?.role ?? null}
           avatarUrl={profile?.avatar_url ?? null}
           unreadCount={unreadCount ?? 0}
+          membersCount={membersCount ?? 0}
         />
 
         {/* ═══════ Admin: Pending alert ═══════ */}
@@ -86,36 +87,32 @@ export default async function HomePage() {
           />
         )}
 
-        {/* ═══════ نظرة سريعة ═══════ */}
+        {/* ═══════ نظرة سريعة (Bento) ═══════ */}
         <Section icon="📊" title="نظرة سريعة" subtitle="إحصائيات العائلة">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
             <StatCard
               icon="👨‍👩‍👧"
               label={COUNT_LABELS.family}
               value={membersCount ?? 0}
-              gradient="from-[#357DED] to-[#5C9AF2]"
-              bgTint="#357DED"
+              tint="#357DED"
             />
             <StatCard
               icon="🏛️"
               label="ديوانيات"
               value={diwaniyasCount ?? 0}
-              gradient="from-[#D97706] to-[#F59E0B]"
-              bgTint="#D97706"
+              tint="#D97706"
             />
             <StatCard
               icon="💼"
               label="مشاريع"
               value={projectsCount ?? 0}
-              gradient="from-[#06B6D4] to-[#22D3EE]"
-              bgTint="#06B6D4"
+              tint="#06B6D4"
             />
             <StatCard
               icon="🔔"
               label="إشعاراتي"
               value={unreadCount ?? 0}
-              gradient="from-[#EF4444] to-[#F87171]"
-              bgTint="#EF4444"
+              tint="#EF4444"
               href="/notifications"
               highlight={(unreadCount ?? 0) > 0}
             />
@@ -123,8 +120,8 @@ export default async function HomePage() {
         </Section>
 
         {/* ═══════ الأقسام ═══════ */}
-        <Section icon="🎯" title="الأقسام" subtitle="تنقل سريع">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        <Section icon="🧭" title="الأقسام" subtitle="تنقل سريع">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
             <FeatureCard
               icon="🌳"
               title="الشجرة"
@@ -242,16 +239,16 @@ export default async function HomePage() {
               </Link>
             }
           >
-            <div className="bg-white rounded-2xl border border-[#E2E8F0] divide-y divide-[#E2E8F0] overflow-hidden">
+            <div className="bg-white rounded-3xl border border-[#E9EEF5] divide-y divide-[#EEF2F7] overflow-hidden shadow-[0_2px_16px_-8px_rgba(15,23,42,0.15)]">
               {recentNotifs.map((n) => (
                 <Link
                   key={n.id}
                   href="/notifications"
-                  className={`flex items-start gap-3 p-3 hover:bg-[#F8FAFC] transition ${
-                    !n.is_read ? "bg-[#FEF9E7]/40" : ""
+                  className={`flex items-start gap-3 p-3.5 hover:bg-[#F8FAFC] transition ${
+                    !n.is_read ? "bg-[#EFF6FF]/50" : ""
                   }`}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-[#F1F5F9] flex items-center justify-center text-lg flex-shrink-0 relative">
+                  <div className="w-10 h-10 rounded-2xl bg-[#F1F5F9] flex items-center justify-center text-lg flex-shrink-0 relative">
                     🔔
                     {!n.is_read && (
                       <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#EF4444] border-2 border-white" />
@@ -266,6 +263,7 @@ export default async function HomePage() {
                       {timeAgo(n.created_at)}
                     </div>
                   </div>
+                  <span className="text-[#CBD5E1] self-center">←</span>
                 </Link>
               ))}
             </div>
@@ -284,66 +282,99 @@ function HeroBanner({
   role,
   avatarUrl,
   unreadCount,
+  membersCount,
 }: {
   firstName: string;
   fullName: string | null;
   role: string | null;
   avatarUrl: string | null;
   unreadCount: number;
+  membersCount: number;
 }) {
   const greeting = getGreeting();
-  const roleColor = roleColorOf(role);
 
   return (
-    <div className="relative overflow-hidden rounded-3xl p-5 md:p-7 bg-gradient-to-br from-[#357DED] via-[#5438DC] to-[#7C3AED] shadow-xl">
-      {/* خلفية زخرفية */}
-      <div className="absolute -top-12 -left-12 w-48 h-48 rounded-full bg-white/10 blur-2xl" />
-      <div className="absolute -bottom-16 -right-12 w-56 h-56 rounded-full bg-white/10 blur-2xl" />
+    <div className="relative overflow-hidden rounded-[28px] p-6 md:p-8 shadow-[0_20px_60px_-24px_rgba(53,125,237,0.6)]">
+      {/* طبقة التدرج */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#357DED] via-[#4A63E0] to-[#5438DC]" />
+      {/* شبكة زخرفية */}
+      <div className="absolute -top-16 -left-10 w-56 h-56 rounded-full bg-white/15 blur-3xl" />
+      <div className="absolute -bottom-20 -right-10 w-72 h-72 rounded-full bg-[#22D3EE]/20 blur-3xl" />
+      <div className="absolute top-1/2 right-1/3 w-40 h-40 rounded-full bg-white/5 blur-2xl" />
+      {/* شجرة باهتة */}
+      <div className="absolute -bottom-6 left-4 text-[120px] leading-none opacity-[0.08] select-none pointer-events-none">
+        🌳
+      </div>
 
-      <div className="relative flex items-center gap-4">
-        {/* الأفاتار */}
-        <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-white/20 backdrop-blur border-2 border-white/40 overflow-hidden flex-shrink-0 shadow-lg">
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-3xl font-black text-white">
-              {firstName?.[0] ?? "؟"}
+      <div className="relative">
+        <div className="flex items-center gap-4">
+          {/* الأفاتار */}
+          <div className="relative flex-shrink-0">
+            <div className="w-[68px] h-[68px] md:w-20 md:h-20 rounded-3xl bg-white/20 backdrop-blur-md border border-white/40 overflow-hidden shadow-xl ring-2 ring-white/30">
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-3xl font-black text-white">
+                  {firstName?.[0] ?? "؟"}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-
-        <div className="flex-1 min-w-0 text-white">
-          <div className="text-sm font-semibold text-white/80 mb-0.5">
-            {greeting} 👋
-          </div>
-          <h1 className="text-xl md:text-2xl font-black truncate">{firstName}</h1>
-          {fullName && (
-            <p className="text-xs md:text-sm text-white/70 truncate mt-0.5">
-              {fullName}
-            </p>
-          )}
-          <div className="flex flex-wrap items-center gap-1.5 mt-2">
-            <span
-              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black"
-              style={{ background: `${roleColor}30`, color: "white" }}
-            >
-              <span>⭐</span>
-              <span>{roleLabel(role)}</span>
+            <span className="absolute -bottom-1 -left-1 w-6 h-6 rounded-full bg-white flex items-center justify-center text-[11px] shadow-md">
+              ⭐
             </span>
-            {unreadCount > 0 && (
-              <Link
-                href="/notifications"
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-[#EF4444] text-white hover:bg-[#DC2626] transition"
-              >
-                <span>🔔</span>
-                <span>{unreadCount} جديد</span>
-              </Link>
+          </div>
+
+          <div className="flex-1 min-w-0 text-white">
+            <div className="text-xs md:text-sm font-bold text-white/75 mb-0.5">
+              {greeting} 👋
+            </div>
+            <h1 className="text-2xl md:text-3xl font-black truncate leading-tight">
+              {firstName}
+            </h1>
+            {fullName && (
+              <p className="text-xs md:text-sm text-white/70 truncate mt-0.5">
+                {fullName}
+              </p>
             )}
           </div>
+
+          {/* بادج الدور — يمين */}
+          <div className="hidden sm:flex flex-col items-end gap-2 flex-shrink-0">
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-black bg-white/20 backdrop-blur text-white border border-white/25">
+              <span>{roleEmoji(role)}</span>
+              <span>{roleLabel(role)}</span>
+            </span>
+          </div>
+        </div>
+
+        {/* شريط سفلي زجاجي: تاريخ + إحصائية + إشعارات */}
+        <div className="mt-5 flex items-center gap-2 flex-wrap">
+          <HeroChip icon="📅" text={todayArabic()} />
+          <HeroChip icon="👨‍👩‍👧" text={`${membersCount.toLocaleString("ar")} فرد`} />
+          {unreadCount > 0 ? (
+            <Link
+              href="/notifications"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-black bg-[#EF4444] text-white shadow-md hover:bg-[#DC2626] transition"
+            >
+              <span>🔔</span>
+              <span>{unreadCount} إشعار جديد</span>
+            </Link>
+          ) : (
+            <HeroChip icon="✅" text="لا إشعارات جديدة" />
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+function HeroChip({ icon, text }: { icon: string; text: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold bg-white/15 backdrop-blur text-white border border-white/20">
+      <span>{icon}</span>
+      <span>{text}</span>
+    </span>
   );
 }
 
@@ -360,21 +391,24 @@ function PendingAlert({
   return (
     <Link
       href="/admin"
-      className="block bg-gradient-to-l from-[#F59E0B] to-[#F97316] rounded-2xl p-4 shadow-md hover:shadow-lg transition group"
+      className="group relative block overflow-hidden rounded-3xl p-0.5 shadow-lg hover:shadow-xl transition"
     >
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-xl bg-white/30 backdrop-blur flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform">
-          ⚠️
-        </div>
-        <div className="flex-1 text-white">
-          <h3 className="font-black text-base">{total} طلب ينتظر المراجعة</h3>
-          <div className="flex flex-wrap gap-2 mt-1 text-xs font-semibold text-white/90">
-            {members > 0 && <span>👥 {members} عضو</span>}
-            {projects > 0 && <span>💼 {projects} مشروع</span>}
-            {diwaniyas > 0 && <span>🏛️ {diwaniyas} ديوانية</span>}
+      <div className="absolute inset-0 bg-gradient-to-l from-[#F59E0B] via-[#F97316] to-[#EF4444]" />
+      <div className="relative m-[2px] rounded-[22px] bg-gradient-to-l from-[#F59E0B] to-[#F97316] p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-white/25 backdrop-blur flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform">
+            ⚠️
           </div>
+          <div className="flex-1 text-white">
+            <h3 className="font-black text-base">{total} طلب ينتظر المراجعة</h3>
+            <div className="flex flex-wrap gap-2 mt-1 text-xs font-semibold text-white/90">
+              {members > 0 && <span>👥 {members} عضو</span>}
+              {projects > 0 && <span>💼 {projects} مشروع</span>}
+              {diwaniyas > 0 && <span>🏛️ {diwaniyas} ديوانية</span>}
+            </div>
+          </div>
+          <span className="text-2xl text-white/90 group-hover:-translate-x-1 transition-transform">←</span>
         </div>
-        <span className="text-2xl text-white/80 group-hover:translate-x-1 transition-transform">←</span>
       </div>
     </Link>
   );
@@ -395,9 +429,11 @@ function Section({
 }) {
   return (
     <section>
-      <div className="flex items-center justify-between mb-3 px-1">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">{icon}</span>
+      <div className="flex items-center justify-between mb-3.5 px-1">
+        <div className="flex items-center gap-2.5">
+          <span className="w-9 h-9 rounded-xl bg-white border border-[#E9EEF5] flex items-center justify-center text-lg shadow-sm">
+            {icon}
+          </span>
           <div>
             <h2 className="font-black text-base md:text-lg text-[#0F172A] leading-tight">
               {title}
@@ -418,36 +454,45 @@ function StatCard({
   icon,
   label,
   value,
-  gradient,
-  bgTint,
+  tint,
   href,
   highlight,
 }: {
   icon: string;
   label: string;
   value: number | string;
-  gradient: string;
-  bgTint: string;
+  tint: string;
   href?: string;
   highlight?: boolean;
 }) {
   const inner = (
     <div
-      className={`relative bg-white rounded-2xl border p-4 transition hover:shadow-md hover:-translate-y-0.5 overflow-hidden ${
-        highlight ? "border-[#EF4444]/40 shadow-sm" : "border-[#E2E8F0]"
-      }`}
+      className="group relative bg-white rounded-3xl border p-4 md:p-5 transition hover:shadow-lg hover:-translate-y-1 overflow-hidden shadow-[0_2px_16px_-10px_rgba(15,23,42,0.2)]"
+      style={{ borderColor: highlight ? `${tint}55` : "#E9EEF5" }}
     >
-      {highlight && (
-        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#EF4444] animate-pulse" />
-      )}
+      {/* هالة لونية أعلى البطاقة */}
       <div
-        className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-xl shadow-sm mb-2`}
-        style={{ boxShadow: `0 4px 12px ${bgTint}30` }}
-      >
-        {icon}
+        className="absolute -top-10 -left-6 w-24 h-24 rounded-full blur-2xl opacity-30 transition group-hover:opacity-50"
+        style={{ background: tint }}
+      />
+      {highlight && (
+        <span
+          className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full animate-pulse"
+          style={{ background: tint }}
+        />
+      )}
+      <div className="relative">
+        <div
+          className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl shadow-sm mb-3"
+          style={{ background: `${tint}18`, boxShadow: `0 8px 20px -8px ${tint}70` }}
+        >
+          {icon}
+        </div>
+        <div className="text-3xl font-black text-[#0F172A] leading-none tabular-nums">
+          {typeof value === "number" ? value.toLocaleString("ar") : value}
+        </div>
+        <div className="text-xs text-[#64748B] mt-1.5 font-bold">{label}</div>
       </div>
-      <div className="text-2xl font-black text-[#0F172A] leading-none">{value}</div>
-      <div className="text-xs text-[#64748B] mt-1 font-semibold">{label}</div>
     </div>
   );
 
@@ -472,21 +517,26 @@ function FeatureCard({
   return (
     <Link
       href={href}
-      className="group relative bg-white rounded-2xl border border-[#E2E8F0] p-4 transition hover:shadow-md hover:-translate-y-0.5 overflow-hidden"
+      className="group relative bg-white rounded-3xl border border-[#E9EEF5] p-4 md:p-5 transition hover:shadow-lg hover:-translate-y-1 overflow-hidden shadow-[0_2px_16px_-10px_rgba(15,23,42,0.2)]"
     >
+      {/* شريط لوني علوي يظهر عند المرور */}
+      <div
+        className="absolute inset-x-0 top-0 h-1 opacity-0 group-hover:opacity-100 transition"
+        style={{ background: color }}
+      />
       {badge !== undefined && badge > 0 && (
-        <span className="absolute top-2 left-2 min-w-[22px] h-[22px] px-1.5 rounded-full bg-[#EF4444] text-white text-[10px] font-black flex items-center justify-center shadow-md animate-pulse">
+        <span className="absolute top-3 left-3 min-w-[22px] h-[22px] px-1.5 rounded-full bg-[#EF4444] text-white text-[10px] font-black flex items-center justify-center shadow-md animate-pulse">
           {badge > 99 ? "99+" : badge}
         </span>
       )}
       <div
-        className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl mb-2 transition-transform group-hover:scale-110 group-hover:rotate-3"
+        className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mb-3 transition-transform group-hover:scale-110 group-hover:-rotate-6"
         style={{ background: `${color}15`, color }}
       >
         {icon}
       </div>
-      <h3 className="font-black text-[#0F172A] text-sm leading-tight">{title}</h3>
-      <p className="text-[11px] text-[#64748B] mt-0.5 line-clamp-1">{desc}</p>
+      <h3 className="font-black text-[#0F172A] text-sm md:text-base leading-tight">{title}</h3>
+      <p className="text-[11px] md:text-xs text-[#64748B] mt-1 line-clamp-1">{desc}</p>
     </Link>
   );
 }
@@ -510,16 +560,16 @@ function AdminActionCard({
   return (
     <Link
       href={href}
-      className="group relative rounded-2xl p-4 transition hover:shadow-md hover:-translate-y-0.5 flex items-center gap-3 border-2 overflow-hidden"
+      className="group relative rounded-3xl p-4 transition hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-3 border overflow-hidden"
       style={{
         background: hasBadge
-          ? `linear-gradient(135deg, ${color}20 0%, ${color}08 100%)`
-          : `linear-gradient(135deg, ${color}10 0%, ${color}03 100%)`,
-        borderColor: hasBadge ? `${color}50` : `${color}25`,
+          ? `linear-gradient(135deg, ${color}1F 0%, ${color}0A 100%)`
+          : "#FFFFFF",
+        borderColor: hasBadge ? `${color}45` : "#E9EEF5",
       }}
     >
       <div
-        className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 shadow-md"
+        className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 shadow-md"
         style={{ background: color, color: "white" }}
       >
         {icon}
@@ -537,7 +587,7 @@ function AdminActionCard({
         </span>
       )}
       <span
-        className="text-xl flex-shrink-0 group-hover:translate-x-1 transition-transform"
+        className="text-xl flex-shrink-0 group-hover:-translate-x-1 transition-transform"
         style={{ color }}
       >
         ←
@@ -564,17 +614,17 @@ function roleLabel(role?: string | null): string {
   }
 }
 
-function roleColorOf(role?: string | null): string {
+function roleEmoji(role?: string | null): string {
   switch (role) {
     case "owner":
     case "admin":
-      return "#5438DC";
+      return "🛡️";
     case "monitor":
-      return "#06B6D4";
+      return "👁️";
     case "supervisor":
-      return "#10B981";
+      return "⭐";
     default:
-      return "#357DED";
+      return "👤";
   }
 }
 
@@ -585,6 +635,18 @@ function getGreeting(): string {
   if (hour < 17) return "نهارك سعيد";
   if (hour < 20) return "مساء الخير";
   return "مساء النور";
+}
+
+function todayArabic(): string {
+  try {
+    return new Intl.DateTimeFormat("ar", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }).format(new Date());
+  } catch {
+    return "";
+  }
 }
 
 function timeAgo(date: string): string {

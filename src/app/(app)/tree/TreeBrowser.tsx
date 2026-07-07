@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { MemberFullEditClient } from "@/app/(app)/admin/profiles/[id]/MemberFullEditClient";
 import { formatPhone } from "@/lib/format-phone";
 import Link from "next/link";
@@ -10,6 +12,7 @@ type Member = {
   first_name: string;
   full_name: string;
   father_id: string | null;
+  mother_id?: string | null;
   role: string;
   status: string;
   avatar_url: string | null;
@@ -20,16 +23,49 @@ type Member = {
   sort_order: number | null;
 };
 
+type WomanMember = {
+  id: string;
+  first_name: string;
+  full_name: string;
+  parent_id: string | null;
+  mother_id: string | null;
+  husband_id: string | null;
+  gender: string | null;
+  is_deceased: boolean | null;
+  birth_date: string | null;
+  death_date: string | null;
+  avatar_url: string | null;
+  sort_order: number | null;
+};
+
+type ExternalSpouse = {
+  id: string;
+  woman_id: string;
+  first_name: string;
+  full_name: string | null;
+  family_name: string | null;
+  nationality: string | null;
+  is_deceased: boolean | null;
+  notes: string | null;
+};
+
 export function TreeBrowser({
   members,
   canModerate = false,
+  canManageRoles = false,
+  women = [],
+  externalSpouses = [],
 }: {
   members: Member[];
   canModerate?: boolean;
+  canManageRoles?: boolean;
   isHR?: boolean;
+  women?: WomanMember[];
+  externalSpouses?: ExternalSpouse[];
 }) {
   const [search, setSearch] = useState("");
   const [focusId, setFocusId] = useState<string | null>(null);
+  const [tab, setTab] = useState<"tree" | "relations">("tree");
 
   const byId = useMemo(() => {
     const m = new Map<string, Member>();
@@ -53,6 +89,48 @@ export function TreeBrowser({
     );
     return m;
   }, [members]);
+
+  // ═══ فهارس العلاقات (نساء + أزواج خارجيين) ═══
+  const womenById = useMemo(() => {
+    const m = new Map<string, WomanMember>();
+    women.forEach((w) => m.set(w.id, w));
+    return m;
+  }, [women]);
+
+  const wivesByHusband = useMemo(() => {
+    const m = new Map<string, WomanMember[]>();
+    women.forEach((w) => {
+      if (w.gender === "female" && w.husband_id) {
+        const arr = m.get(w.husband_id) ?? [];
+        arr.push(w);
+        m.set(w.husband_id, arr);
+      }
+    });
+    return m;
+  }, [women]);
+
+  const daughtersByFather = useMemo(() => {
+    const m = new Map<string, WomanMember[]>();
+    women.forEach((w) => {
+      if (w.gender === "female" && w.parent_id) {
+        const arr = m.get(w.parent_id) ?? [];
+        arr.push(w);
+        m.set(w.parent_id, arr);
+      }
+    });
+    m.forEach((arr) => arr.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
+    return m;
+  }, [women]);
+
+  const externalByWoman = useMemo(() => {
+    const m = new Map<string, ExternalSpouse[]>();
+    externalSpouses.forEach((e) => {
+      const arr = m.get(e.woman_id) ?? [];
+      arr.push(e);
+      m.set(e.woman_id, arr);
+    });
+    return m;
+  }, [externalSpouses]);
 
   // Root — أكبر جد بدون أب لكن عنده أبناء
   const root = useMemo(() => {
@@ -96,6 +174,25 @@ export function TreeBrowser({
     return all.filter((m) => m.id !== focused.id);
   }, [focused, childrenByFather]);
 
+  // ═══ علاقات العضو المحوري ═══
+  // الأم: نبحث في نسخة الرجل داخل جدول النساء (نفس الـ id) ثم نحلّ الأم
+  const mother = useMemo<WomanMember | null>(() => {
+    if (!focused) return null;
+    const motherId = womenById.get(focused.id)?.mother_id ?? focused.mother_id ?? null;
+    if (!motherId) return null;
+    return womenById.get(motherId) ?? null;
+  }, [focused, womenById]);
+
+  const wives = useMemo<WomanMember[]>(() => {
+    if (!focused) return [];
+    return wivesByHusband.get(focused.id) ?? [];
+  }, [focused, wivesByHusband]);
+
+  const daughters = useMemo<WomanMember[]>(() => {
+    if (!focused) return [];
+    return daughtersByFather.get(focused.id) ?? [];
+  }, [focused, daughtersByFather]);
+
   // عدد الأحفاد (الأبناء + الأحفاد + ...)
   const totalDescendants = useMemo(() => {
     if (!focused) return 0;
@@ -128,6 +225,12 @@ export function TreeBrowser({
   function focus(id: string) {
     setFocusId(id);
     setSearch("");
+  }
+
+  // اسم الزوج الداخلي (رجل من العائلة) إن وُجد
+  function internalHusbandName(husbandId: string | null): string | null {
+    if (!husbandId) return null;
+    return byId.get(husbandId)?.full_name ?? womenById.get(husbandId)?.full_name ?? null;
   }
 
   return (
@@ -238,21 +341,52 @@ export function TreeBrowser({
             totalDescendants={totalDescendants}
             father={focused.father_id ? byId.get(focused.father_id) ?? null : null}
             canModerate={canModerate}
+            canManageRoles={canManageRoles}
             onFatherClick={() => focused.father_id && focus(focused.father_id)}
             siblings={siblings}
             siblingChildrenCount={(id) => childrenByFather.get(id)?.length ?? 0}
             onSiblingClick={focus}
+            allMembers={members}
+            directChildren={directChildren}
+            onNavigate={focus}
           />
 
-          {/* ═══════ الأبناء ═══════ */}
-          {directChildren.length > 0 ? (
-            <Section
-              title="الأبناء"
-              count={directChildren.length}
-              icon="👨‍👦"
-              color="#5438DC"
-              compact
-            >
+          {/* ═══════ التابات (العلاقات — للمدراء فقط) ═══════ */}
+          {canModerate && (
+            <div className="flex gap-1.5 bg-white rounded-2xl border border-[#E2E8F0] p-1 shadow-sm">
+              <TabButton
+                active={tab === "tree"}
+                onClick={() => setTab("tree")}
+                icon="👨‍👦"
+                label="الأبناء"
+                count={directChildren.length}
+              />
+              <TabButton
+                active={tab === "relations"}
+                onClick={() => setTab("relations")}
+                icon="👨‍👩‍👧"
+                label="العلاقات"
+                count={wives.length + daughters.length + (mother ? 1 : 0)}
+                accent="#EC4899"
+              />
+            </div>
+          )}
+
+          {/* ═══════ محتوى التاب ═══════ */}
+          {tab === "relations" && canModerate ? (
+            <RelationsPanel
+              focused={focused}
+              mother={mother}
+              wives={wives}
+              sons={directChildren}
+              daughters={daughters}
+              internalHusbandName={internalHusbandName}
+              externalByWoman={externalByWoman}
+              onFocus={focus}
+              childrenCountOf={(id) => childrenByFather.get(id)?.length ?? 0}
+            />
+          ) : directChildren.length > 0 ? (
+            <Section title="الأبناء" count={directChildren.length} icon="👨‍👦" color="#5438DC" compact>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1">
                 {directChildren.map((c) => (
                   <NodeCard
@@ -277,6 +411,465 @@ export function TreeBrowser({
   );
 }
 
+// ═══════════ Tab Button ═══════════
+function TabButton({
+  active,
+  onClick,
+  icon,
+  label,
+  count,
+  accent = "#10B981",
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: string;
+  label: string;
+  count: number;
+  accent?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-black transition ${
+        active ? "text-white shadow-sm" : "text-[#64748B] hover:bg-[#F1F5F9]"
+      }`}
+      style={active ? { background: accent } : undefined}
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+      <span
+        className={`px-1.5 rounded-full text-[10px] font-black ${
+          active ? "bg-white/25" : "bg-[#E2E8F0] text-[#64748B]"
+        }`}
+      >
+        {count}
+      </span>
+    </button>
+  );
+}
+
+// ═══════════ Relations Panel ═══════════
+function RelationsPanel({
+  focused,
+  mother,
+  wives,
+  sons,
+  daughters,
+  internalHusbandName,
+  externalByWoman,
+  onFocus,
+  childrenCountOf,
+}: {
+  focused: Member;
+  mother: WomanMember | null;
+  wives: WomanMember[];
+  sons: Member[];
+  daughters: WomanMember[];
+  internalHusbandName: (husbandId: string | null) => string | null;
+  externalByWoman: Map<string, ExternalSpouse[]>;
+  onFocus: (id: string) => void;
+  childrenCountOf: (id: string) => number;
+}) {
+  const nothing =
+    !mother && wives.length === 0 && sons.length === 0 && daughters.length === 0;
+
+  return (
+    <div className="space-y-2">
+      <div className="bg-[#FDF2F8] border border-[#FBCFE8] rounded-2xl px-3 py-2 text-[11px] text-[#9D174D] font-bold flex items-center gap-1.5">
+        <span>💠</span>
+        <span>لوحة العلاقات — خاصة بالويب والمدراء فقط. تشمل الأم والزوجات والأبناء والبنات والأزواج من خارج العائلة.</span>
+      </div>
+
+      {nothing && (
+        <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 text-center">
+          <div className="text-3xl mb-1">🔗</div>
+          <p className="text-[#0F172A] font-bold text-sm">لا توجد علاقات مسجّلة لهذا العضو</p>
+        </div>
+      )}
+
+      {/* الأم */}
+      {mother && (
+        <Section title="الأم" count={1} icon="👩" color="#DB2777" compact>
+          <WomanRow woman={mother} externals={externalByWoman.get(mother.id) ?? []} />
+        </Section>
+      )}
+
+      {/* الزوجات */}
+      {wives.length > 0 && (
+        <Section title="الزوجات" count={wives.length} icon="💍" color="#DB2777" compact>
+          <div className="space-y-1">
+            {wives.map((w) => (
+              <WomanRow key={w.id} woman={w} externals={externalByWoman.get(w.id) ?? []} />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* الأبناء */}
+      {sons.length > 0 && (
+        <Section title="الأبناء" count={sons.length} icon="👨‍👦" color="#5438DC" compact>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1">
+            {sons.map((c) => (
+              <NodeCard
+                key={c.id}
+                member={c}
+                onClick={() => onFocus(c.id)}
+                childrenCount={childrenCountOf(c.id)}
+                compact
+              />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* البنات + الزوج الخارجي */}
+      {daughters.length > 0 && (
+        <Section title="البنات" count={daughters.length} icon="👧" color="#EC4899" compact>
+          <div className="space-y-1.5">
+            {daughters.map((d) => (
+              <DaughterRow
+                key={d.id}
+                daughter={d}
+                internalHusbandName={internalHusbandName(d.husband_id)}
+                externals={externalByWoman.get(d.id) ?? []}
+              />
+            ))}
+          </div>
+        </Section>
+      )}
+      <div className="text-[10px] text-[#94A3B8] text-center pt-1">
+        {focused.full_name}
+      </div>
+    </div>
+  );
+}
+
+// صف امرأة (أم/زوجة) — عرض فقط + عرض الزوج الخارجي إن وُجد
+function WomanRow({
+  woman,
+  externals,
+}: {
+  woman: WomanMember;
+  externals: ExternalSpouse[];
+}) {
+  return (
+    <div className="flex items-center gap-3 bg-[#FDF2F8]/60 border border-[#FCE7F3] rounded-xl p-2">
+      <Avatar name={woman.first_name} url={woman.avatar_url} color="#DB2777" deceased={woman.is_deceased} />
+      <div className="flex-1 min-w-0">
+        <div className="font-black text-sm text-[#0F172A] truncate">
+          {woman.full_name}
+          {woman.is_deceased && <span className="mr-1 text-[11px] text-[#6B7B8D]">🕊️</span>}
+        </div>
+        {externals.length > 0 && (
+          <div className="text-[11px] text-[#9D174D] font-bold mt-0.5">
+            الزوج (خارج العائلة): {externals.map((e) => e.full_name || e.first_name).join("، ")}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// صف بنت — يعرض حالة الزواج + إدارة الزوج الخارجي
+function DaughterRow({
+  daughter,
+  internalHusbandName,
+  externals,
+}: {
+  daughter: WomanMember;
+  internalHusbandName: string | null;
+  externals: ExternalSpouse[];
+}) {
+  const ext = externals[0] ?? null;
+
+  return (
+    <div className="bg-white border border-[#F3D9E6] rounded-xl p-2.5">
+      <div className="flex items-center gap-3">
+        <Avatar name={daughter.first_name} url={daughter.avatar_url} color="#EC4899" deceased={daughter.is_deceased} />
+        <div className="flex-1 min-w-0">
+          <div className="font-black text-sm text-[#0F172A] truncate">
+            {daughter.full_name}
+            {daughter.is_deceased && <span className="mr-1 text-[11px] text-[#6B7B8D]">🕊️</span>}
+          </div>
+          {/* حالة الزواج */}
+          {internalHusbandName ? (
+            <div className="text-[11px] text-[#357DED] font-bold mt-0.5">
+              💍 الزوج: {internalHusbandName} <span className="text-[#94A3B8]">(من العائلة)</span>
+            </div>
+          ) : ext ? (
+            <div className="text-[11px] text-[#9D174D] font-bold mt-0.5">
+              🌍 الزوج (خارج العائلة): {ext.full_name || ext.first_name}
+              {ext.family_name ? ` ${ext.family_name}` : ""}
+              {ext.nationality ? ` — ${ext.nationality}` : ""}
+              {ext.is_deceased ? " 🕊️" : ""}
+            </div>
+          ) : (
+            <div className="text-[11px] text-[#94A3B8] font-semibold mt-0.5">لا يوجد زوج مسجّل</div>
+          )}
+        </div>
+        {/* زر إدارة الزوج الخارجي — يظهر فقط إن لم يكن لها زوج من العائلة */}
+        {!internalHusbandName && (
+          <ExternalHusbandButton womanId={daughter.id} womanName={daughter.full_name} existing={ext} />
+        )}
+      </div>
+      {ext?.notes && (
+        <div className="text-[11px] text-[#64748B] mt-1.5 pr-14 whitespace-pre-wrap">
+          📝 {ext.notes}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════ External Husband Modal ═══════════
+function ExternalHusbandButton({
+  womanId,
+  womanName,
+  existing,
+}: {
+  womanId: string;
+  womanName: string;
+  existing: ExternalSpouse | null;
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [firstName, setFirstName] = useState(existing?.first_name ?? "");
+  const [familyName, setFamilyName] = useState(existing?.family_name ?? "");
+  const [nationality, setNationality] = useState(existing?.nationality ?? "");
+  const [isDeceased, setIsDeceased] = useState(existing?.is_deceased ?? false);
+  const [notes, setNotes] = useState(existing?.notes ?? "");
+
+  function openModal() {
+    setFirstName(existing?.first_name ?? "");
+    setFamilyName(existing?.family_name ?? "");
+    setNationality(existing?.nationality ?? "");
+    setIsDeceased(existing?.is_deceased ?? false);
+    setNotes(existing?.notes ?? "");
+    setError(null);
+    setOpen(true);
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!firstName.trim()) {
+      setError("الاسم مطلوب");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+
+    const full = [firstName.trim(), familyName.trim()].filter(Boolean).join(" ");
+    const payload = {
+      woman_id: womanId,
+      first_name: firstName.trim(),
+      full_name: full || firstName.trim(),
+      family_name: familyName.trim() || null,
+      nationality: nationality.trim() || null,
+      is_deceased: isDeceased,
+      notes: notes.trim() || null,
+    };
+
+    const { error: err } = existing
+      ? await supabase.from("external_spouses").update(payload).eq("id", existing.id)
+      : await supabase.from("external_spouses").insert(payload);
+
+    if (err) {
+      setBusy(false);
+      setError("خطأ: " + err.message);
+      return;
+    }
+    setBusy(false);
+    setOpen(false);
+    router.refresh();
+  }
+
+  async function remove() {
+    if (!existing) return;
+    if (!confirm("حذف الزوج الخارجي المسجّل؟")) return;
+    setBusy(true);
+    const { error: err } = await supabase.from("external_spouses").delete().eq("id", existing.id);
+    if (err) {
+      setBusy(false);
+      setError("خطأ: " + err.message);
+      return;
+    }
+    setBusy(false);
+    setOpen(false);
+    router.refresh();
+  }
+
+  return (
+    <>
+      <button
+        onClick={openModal}
+        className={`flex-shrink-0 h-8 px-2.5 rounded-lg text-[11px] font-black transition ${
+          existing
+            ? "bg-[#FCE7F3] text-[#9D174D] hover:bg-[#FBCFE8]"
+            : "bg-[#EC4899] text-white hover:opacity-90"
+        }`}
+        title={existing ? "تعديل الزوج الخارجي" : "إضافة زوج من خارج العائلة"}
+      >
+        {existing ? "✏️ تعديل" : "➕ زوج خارجي"}
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4">
+          <form
+            onSubmit={submit}
+            className="bg-white rounded-t-3xl md:rounded-3xl w-full md:max-w-md max-h-[92vh] overflow-y-auto"
+          >
+            {/* header */}
+            <div className="sticky top-0 bg-white border-b border-[#E2E8F0] px-4 py-3 flex items-center justify-between">
+              <div>
+                <h3 className="font-black text-[#0F172A]">
+                  {existing ? "تعديل الزوج الخارجي" : "زوج من خارج العائلة"}
+                </h3>
+                <p className="text-[11px] text-[#64748B]">للزوجة: {womanName}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="w-8 h-8 rounded-full bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              <Field label="الاسم *">
+                <input
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="اسم الزوج"
+                  className="ext-input"
+                  autoFocus
+                />
+              </Field>
+              <Field label="اسم العائلة / القبيلة">
+                <input
+                  value={familyName}
+                  onChange={(e) => setFamilyName(e.target.value)}
+                  placeholder="مثال: العتيبي"
+                  className="ext-input"
+                />
+              </Field>
+              <Field label="الجنسية">
+                <input
+                  value={nationality}
+                  onChange={(e) => setNationality(e.target.value)}
+                  placeholder="مثال: كويتي"
+                  className="ext-input"
+                />
+              </Field>
+              <label className="flex items-center gap-2 cursor-pointer select-none py-1">
+                <input
+                  type="checkbox"
+                  checked={isDeceased}
+                  onChange={(e) => setIsDeceased(e.target.checked)}
+                  className="w-4 h-4 accent-[#EC4899]"
+                />
+                <span className="text-sm font-bold text-[#0F172A]">🕊️ متوفى</span>
+              </label>
+              <Field label="ملاحظات">
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={3}
+                  placeholder="أي معلومات إضافية..."
+                  className="ext-input resize-none"
+                />
+              </Field>
+
+              {error && (
+                <div className="bg-red-50 text-red-700 text-xs font-bold rounded-xl p-2.5">{error}</div>
+              )}
+            </div>
+
+            {/* footer */}
+            <div className="sticky bottom-0 bg-white border-t border-[#E2E8F0] px-4 py-3 flex items-center gap-2">
+              {existing && (
+                <button
+                  type="button"
+                  onClick={remove}
+                  disabled={busy}
+                  className="h-11 px-4 rounded-xl bg-red-50 text-red-600 font-black text-sm hover:bg-red-100 disabled:opacity-50"
+                >
+                  🗑️ حذف
+                </button>
+              )}
+              <button
+                type="submit"
+                disabled={busy}
+                className="flex-1 h-11 rounded-xl bg-[#EC4899] text-white font-black text-sm hover:opacity-90 disabled:opacity-50"
+              >
+                {busy ? "جارٍ الحفظ..." : existing ? "حفظ التعديلات" : "إضافة"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <style jsx>{`
+        :global(.ext-input) {
+          width: 100%;
+          padding: 0.6rem 0.75rem;
+          background: #f1f5f9;
+          border-radius: 0.75rem;
+          outline: none;
+          font-size: 0.875rem;
+          font-weight: 600;
+          color: #0f172a;
+        }
+        :global(.ext-input:focus) {
+          box-shadow: 0 0 0 2px #ec489955;
+        }
+      `}</style>
+    </>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="text-[11px] font-black text-[#64748B] mb-1 block">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+// صورة دائرية صغيرة موحّدة
+function Avatar({
+  name,
+  url,
+  color,
+  deceased,
+}: {
+  name: string;
+  url: string | null;
+  color: string;
+  deceased?: boolean | null;
+}) {
+  return (
+    <div
+      className={`w-11 h-11 rounded-xl flex items-center justify-center text-white font-black overflow-hidden flex-shrink-0 ${
+        deceased ? "grayscale opacity-70" : ""
+      }`}
+      style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}
+    >
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" className="w-full h-full object-cover" />
+      ) : (
+        name.charAt(0)
+      )}
+    </div>
+  );
+}
+
 // ═══════════ Focused Member Card ═══════════
 function FocusedMemberCard({
   member,
@@ -285,10 +878,14 @@ function FocusedMemberCard({
   totalDescendants,
   father,
   canModerate,
+  canManageRoles,
   onFatherClick,
   siblings,
   siblingChildrenCount,
   onSiblingClick,
+  allMembers,
+  directChildren,
+  onNavigate,
 }: {
   member: Member;
   generation: number;
@@ -296,10 +893,14 @@ function FocusedMemberCard({
   totalDescendants: number;
   father: Member | null;
   canModerate: boolean;
+  canManageRoles: boolean;
   onFatherClick: () => void;
   siblings: Member[];
   siblingChildrenCount: (id: string) => number;
   onSiblingClick: (id: string) => void;
+  allMembers: Member[];
+  directChildren: Member[];
+  onNavigate: (id: string) => void;
 }) {
   const [siblingsOpen, setSiblingsOpen] = useState(false);
   const roleColor = roleColorOf(member.role);
@@ -327,8 +928,11 @@ function FocusedMemberCard({
               <MemberFullEditClient
                 key={member.id}
                 member={member}
-                canManageRoles={canModerate}
+                canManageRoles={canManageRoles}
                 variant="icon"
+                allMembers={allMembers}
+                childrenList={directChildren}
+                onNavigate={onNavigate}
               />
             </div>
           ) : (
@@ -471,18 +1075,6 @@ function LabelPill({
       <span className="opacity-80">{label}:</span>
       {icon && <span>{icon}</span>}
       <span>{value}</span>
-    </span>
-  );
-}
-
-// ═══════════ Pill ═══════════
-function Pill({ color, children }: { color: string; children: React.ReactNode }) {
-  return (
-    <span
-      className="inline-flex items-center gap-0.5 px-2.5 py-0.5 rounded-full text-[10px] font-black"
-      style={{ background: `${color}18`, color }}
-    >
-      {children}
     </span>
   );
 }

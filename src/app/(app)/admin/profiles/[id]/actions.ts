@@ -16,6 +16,7 @@ type Updates = {
   is_married?: boolean | null;
   status?: string;
   role?: string;
+  father_id?: string | null;
 };
 
 export async function updateMemberAction(
