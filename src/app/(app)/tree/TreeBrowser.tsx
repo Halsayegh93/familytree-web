@@ -57,6 +57,7 @@ type WebRelative = {
   child_profile_id: string | null;
   mother_rel_id: string | null;
   mother_name: string | null;
+  linked_woman_id: string | null;
   is_deceased: boolean | null;
   husband_type: "family" | "external" | null;
   husband_profile_id: string | null;
@@ -270,6 +271,12 @@ export function TreeBrowser({
     return opts.filter((o) => o.name.trim());
   }, [wives, webWives]);
 
+  // نساء العائلة (women_members إناث) — لاختيار زوجة من العائلة
+  const familyWomen = useMemo<WomanMember[]>(
+    () => women.filter((w) => w.gender === "female"),
+    [women]
+  );
+
   // أسماء الأمهات المرتبطة بأبناء/بنات هذا العضو (للتحذير قبل حذف الزوجة)
   const motherNamesInUse = useMemo<Set<string>>(() => {
     const s = new Set<string>();
@@ -442,6 +449,7 @@ export function TreeBrowser({
             wifeOptions={wifeOptions}
             sonMotherByChild={webSonMotherByChild}
             motherNamesInUse={motherNamesInUse}
+            familyWomen={familyWomen}
           />
 
           {/* ═══════ التابات (العلاقات — للمدراء فقط) ═══════ */}
@@ -470,6 +478,10 @@ export function TreeBrowser({
             <RelationsPanel
               focused={focused}
               mother={mother}
+              wives={wives}
+              webWives={webWives}
+              familyWomen={familyWomen}
+              motherNamesInUse={motherNamesInUse}
               sons={directChildren}
               daughters={daughters}
               webDaughters={webDaughters}
@@ -548,6 +560,10 @@ function TabButton({
 function RelationsPanel({
   focused,
   mother,
+  wives,
+  webWives,
+  familyWomen,
+  motherNamesInUse,
   sons,
   daughters,
   webDaughters,
@@ -561,6 +577,10 @@ function RelationsPanel({
 }: {
   focused: Member;
   mother: WomanMember | null;
+  wives: WomanMember[];
+  webWives: WebRelative[];
+  familyWomen: WomanMember[];
+  motherNamesInUse: Set<string>;
   sons: Member[];
   daughters: WomanMember[];
   webDaughters: WebRelative[];
@@ -574,14 +594,15 @@ function RelationsPanel({
 }) {
   const [addingDaughter, setAddingDaughter] = useState(false);
   const totalDaughters = daughters.length + webDaughters.length;
+  const totalWives = wives.length + webWives.length;
   const nothing =
-    !mother && sons.length === 0 && totalDaughters === 0 && !canEditMembers;
+    !mother && sons.length === 0 && totalDaughters === 0 && totalWives === 0 && !canEditMembers;
 
   return (
     <div className="space-y-2">
       <div className="bg-[#FDF2F8] border border-[#FBCFE8] rounded-2xl px-3 py-2 text-[11px] text-[#9D174D] font-bold flex items-center gap-1.5">
         <span>🔒</span>
-        <span>لوحة العلاقات — خاصة بالموقع فقط، لا تظهر بتطبيق الآيفون/الأندرويد. تشمل الأم والأبناء والبنات وأزواجهن.</span>
+        <span>مكان تعديل العلاقات عند العضو. الإضافات 🌐 خاصة بالموقع؛ سجلات 📱 من التطبيق (تعديلها/حذفها يظهر بالتطبيق).</span>
       </div>
 
       {nothing && (
@@ -589,6 +610,20 @@ function RelationsPanel({
           <div className="text-3xl mb-1">🔗</div>
           <p className="text-[#0F172A] font-bold text-sm">لا توجد علاقات مسجّلة لهذا العضو</p>
         </div>
+      )}
+
+      {/* الزوجات — مكان التعديل عند العضو */}
+      {(totalWives > 0 || canEditMembers) && (
+        <Section title="الزوجات" count={totalWives} icon="💍" color="#DB2777" compact>
+          <WivesInline
+            husbandId={focused.id}
+            wives={wives}
+            webWives={webWives}
+            canEdit={canEditMembers}
+            motherNamesInUse={motherNamesInUse}
+            familyWomen={familyWomen}
+          />
+        </Section>
       )}
 
       {/* الأم */}
@@ -716,6 +751,7 @@ function WebDaughterRow({
             {daughter.name}
             {daughter.is_deceased && <span className="mr-1 text-[11px] text-[#6B7B8D]">🕊️</span>}
           </div>
+          <SourceBadge kind="web" />
           {daughter.mother_name && (
             <div className="text-[11px] text-[#DB2777] font-bold mt-0.5">👩 الأم: {daughter.mother_name}</div>
           )}
@@ -1072,6 +1108,7 @@ function WomanRow({
           {woman.full_name}
           {woman.is_deceased && <span className="mr-1 text-[11px] text-[#6B7B8D]">🕊️</span>}
         </div>
+        <SourceBadge kind="app" />
         {externals.length > 0 && (
           <div className="text-[11px] text-[#9D174D] font-bold mt-0.5">
             الزوج (خارج العائلة): {externals.map((e) => e.full_name || e.first_name).join("، ")}
@@ -1117,6 +1154,7 @@ function DaughterRow({
             {daughter.full_name}
             {daughter.is_deceased && <span className="mr-1 text-[11px] text-[#6B7B8D]">🕊️</span>}
           </div>
+          <SourceBadge kind="app" />
           {/* حالة الزواج */}
           {internalHusbandName ? (
             <div className="text-[11px] text-[#357DED] font-bold mt-0.5">
@@ -1410,6 +1448,25 @@ function Avatar({
   );
 }
 
+// شارة مصدر السجل: من التطبيق (بيانات مشتركة) أو من الموقع (خاص)
+function SourceBadge({ kind }: { kind: "app" | "web" }) {
+  return kind === "app" ? (
+    <span
+      className="inline-flex items-center gap-0.5 mt-0.5 px-1.5 py-0 rounded-full text-[9px] font-black bg-[#EFF6FF] text-[#1D4ED8]"
+      title="سجل من التطبيق — التعديل/الحذف يظهر بالآيفون والأندرويد"
+    >
+      📱 من التطبيق
+    </span>
+  ) : (
+    <span
+      className="inline-flex items-center gap-0.5 mt-0.5 px-1.5 py-0 rounded-full text-[9px] font-black bg-[#FCE7F3] text-[#9D174D]"
+      title="خاص بالموقع — لا يظهر بالتطبيق"
+    >
+      🌐 من الموقع
+    </span>
+  );
+}
+
 // ═══════════ Focused Member Card ═══════════
 function FocusedMemberCard({
   member,
@@ -1432,6 +1489,7 @@ function FocusedMemberCard({
   wifeOptions,
   sonMotherByChild,
   motherNamesInUse,
+  familyWomen,
 }: {
   member: Member;
   generation: number;
@@ -1453,6 +1511,7 @@ function FocusedMemberCard({
   wifeOptions: WifeOption[];
   sonMotherByChild: Map<string, WebRelative>;
   motherNamesInUse: Set<string>;
+  familyWomen: WomanMember[];
 }) {
   const [siblingsOpen, setSiblingsOpen] = useState(false);
   const roleColor = roleColorOf(member.role);
@@ -1611,6 +1670,7 @@ function FocusedMemberCard({
               webWives={webWives}
               canEdit={canEditMembers}
               motherNamesInUse={motherNamesInUse}
+              familyWomen={familyWomen}
             />
           )}
         </div>
@@ -1628,12 +1688,14 @@ function WivesInline({
   webWives,
   canEdit,
   motherNamesInUse,
+  familyWomen,
 }: {
   husbandId: string;
   wives: WomanMember[];
   webWives: WebRelative[];
   canEdit: boolean;
   motherNamesInUse: Set<string>;
+  familyWomen: WomanMember[];
 }) {
   const [editing, setEditing] = useState<WebRelative | "new" | null>(null);
   const [editingReal, setEditingReal] = useState<WomanMember | null>(null);
@@ -1651,8 +1713,9 @@ function WivesInline({
             key={w.id}
             onClick={() => setEditingReal(w)}
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-[#EFF6FF] text-[#1D4ED8] hover:bg-[#DBEAFE] transition"
-            title="تعديل كامل (سجل حقيقي)"
+            title="تعديل كامل (سجل من التطبيق)"
           >
+            <span>📱</span>
             <span>{w.full_name}</span>
             {w.is_deceased && <span>🕊️</span>}
             <span className="opacity-60">✎</span>
@@ -1663,6 +1726,7 @@ function WivesInline({
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-[#F1F5F9] text-[#475569]"
             title="من شجرة النساء (التطبيق)"
           >
+            <span>📱</span>
             <span>{w.full_name}</span>
             {w.is_deceased && <span>🕊️</span>}
           </span>
@@ -1676,8 +1740,9 @@ function WivesInline({
             key={w.id}
             onClick={() => setEditing(w)}
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-[#FCE7F3] text-[#9D174D] hover:bg-[#FBCFE8] transition"
-            title="تعديل / حذف"
+            title="تعديل / حذف (خاص بالموقع)"
           >
+            <span>🌐</span>
             <span>{w.name}</span>
             {w.name && motherNamesInUse.has(w.name) && <span title="مرتبطة كأم لأبناء">👶</span>}
             {w.is_deceased && <span>🕊️</span>}
@@ -1688,6 +1753,7 @@ function WivesInline({
             key={w.id}
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-[#FCE7F3] text-[#9D174D]"
           >
+            <span>🌐</span>
             <span>{w.name}</span>
             {w.is_deceased && <span>🕊️</span>}
           </span>
@@ -1708,6 +1774,7 @@ function WivesInline({
           husbandId={husbandId}
           wife={editing === "new" ? null : editing}
           isMother={editing !== "new" && !!editing.name && motherNamesInUse.has(editing.name)}
+          familyWomen={familyWomen}
           onClose={() => setEditing(null)}
         />
       )}
@@ -1723,19 +1790,35 @@ function WifeModal({
   husbandId,
   wife,
   isMother,
+  familyWomen,
   onClose,
 }: {
   husbandId: string;
   wife: WebRelative | null;
   isMother: boolean;
+  familyWomen: WomanMember[];
   onClose: () => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const [source, setSource] = useState<"manual" | "family">(
+    wife?.linked_woman_id ? "family" : "manual"
+  );
   const [name, setName] = useState(wife?.name ?? "");
+  const [linkedWomanId, setLinkedWomanId] = useState<string | null>(wife?.linked_woman_id ?? null);
+  const [familySearch, setFamilySearch] = useState("");
   const [isDeceased, setIsDeceased] = useState(wife?.is_deceased ?? false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const familyMatches = useMemo(() => {
+    if (!familySearch.trim()) return [];
+    const q = familySearch.toLowerCase();
+    return familyWomen.filter((w) => w.full_name.toLowerCase().includes(q)).slice(0, 8);
+  }, [familySearch, familyWomen]);
+  const chosenFamilyName = linkedWomanId
+    ? familyWomen.find((w) => w.id === linkedWomanId)?.full_name ?? name
+    : null;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -1750,6 +1833,7 @@ function WifeModal({
       man_id: husbandId,
       kind: "wife",
       name: name.trim(),
+      linked_woman_id: source === "family" ? linkedWomanId : null,
       is_deceased: isDeceased,
     };
 
@@ -1805,16 +1889,88 @@ function WifeModal({
         </div>
 
         <div className="p-4 space-y-3">
-          <label className="block">
-            <span className="text-[11px] font-black text-[#64748B] mb-1 block">اسم الزوجة *</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="مثال: مريم محمد العتيبي"
-              autoFocus
-              className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#EC4899] text-sm font-semibold"
-            />
-          </label>
+          {/* مصدر الزوجة: يدوي أو من العائلة */}
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => { setSource("manual"); setLinkedWomanId(null); }}
+              className={`flex-1 h-9 rounded-lg text-xs font-black transition ${
+                source === "manual" ? "bg-[#EC4899] text-white" : "bg-[#F1F5F9] text-[#64748B]"
+              }`}
+            >
+              ✍️ اسم يدوي
+            </button>
+            <button
+              type="button"
+              onClick={() => setSource("family")}
+              className={`flex-1 h-9 rounded-lg text-xs font-black transition ${
+                source === "family" ? "bg-[#EC4899] text-white" : "bg-[#F1F5F9] text-[#64748B]"
+              }`}
+            >
+              👪 من العائلة
+            </button>
+          </div>
+
+          {source === "manual" ? (
+            <label className="block">
+              <span className="text-[11px] font-black text-[#64748B] mb-1 block">اسم الزوجة *</span>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="مثال: مريم محمد العتيبي"
+                autoFocus
+                className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#EC4899] text-sm font-semibold"
+              />
+            </label>
+          ) : (
+            <div>
+              <span className="text-[11px] font-black text-[#64748B] mb-1 block">اختر الزوجة من العائلة *</span>
+              {chosenFamilyName ? (
+                <div className="flex items-center justify-between px-3 py-2.5 bg-[#FDF2F8] rounded-xl">
+                  <span className="font-bold text-sm text-[#0F172A] truncate">👪 {chosenFamilyName}</span>
+                  <button
+                    type="button"
+                    onClick={() => { setLinkedWomanId(null); setName(""); }}
+                    className="text-[#EF4444] text-xs font-bold flex-shrink-0 mr-2"
+                  >
+                    تغيير
+                  </button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <input
+                    value={familySearch}
+                    onChange={(e) => setFamilySearch(e.target.value)}
+                    placeholder="ابحث باسم المرأة من العائلة..."
+                    className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#EC4899] text-sm"
+                  />
+                  {familyMatches.length > 0 && (
+                    <div className="absolute top-full mt-1 right-0 left-0 bg-white rounded-xl border border-[#E2E8F0] z-20 max-h-48 overflow-y-auto shadow-xl">
+                      {familyMatches.map((w) => (
+                        <button
+                          key={w.id}
+                          type="button"
+                          onClick={() => {
+                            setLinkedWomanId(w.id);
+                            setName(w.full_name);
+                            setIsDeceased(w.is_deceased ?? false);
+                            setFamilySearch("");
+                          }}
+                          className="w-full text-right px-3 py-2 hover:bg-[#F1F5F9] border-b border-[#E2E8F0] last:border-0 text-sm font-bold text-[#0F172A]"
+                        >
+                          {w.full_name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {familySearch.trim() && familyMatches.length === 0 && (
+                    <p className="text-[10px] text-[#94A3B8] font-bold mt-1">ما في نتائج مطابقة</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <label className="flex items-center gap-2 cursor-pointer select-none py-1">
             <input
               type="checkbox"
@@ -1911,6 +2067,12 @@ function WomanMemberEditModal({
       setError("الاسم مطلوب");
       return;
     }
+    if (
+      !confirm(
+        `⚠️ «${fullName.trim()}» سجل من التطبيق (آيفون/أندرويد). الحفظ سيظهر بالتطبيق أيضاً. متابعة؟`
+      )
+    )
+      return;
     setBusy(true);
     setError(null);
     const { error: err } = await supabase
@@ -1930,6 +2092,22 @@ function WomanMemberEditModal({
     router.refresh();
   }
 
+  async function remove() {
+    if (
+      !confirm(
+        `🗑️ حذف «${woman.full_name}»؟\n⚠️ هذا سجل من التطبيق (آيفون/أندرويد) — الحذف يظهر بالتطبيق أيضاً ولا يمكن التراجع.`
+      )
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    const { error: err } = await supabase.from("women_members").delete().eq("id", woman.id);
+    setBusy(false);
+    if (err) return setError("خطأ: " + err.message);
+    onClose();
+    router.refresh();
+  }
+
   return (
     <div className="fixed inset-0 z-[110] bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4">
       <form
@@ -1937,7 +2115,7 @@ function WomanMemberEditModal({
         className="bg-white rounded-t-3xl md:rounded-3xl w-full md:max-w-md max-h-[92vh] overflow-y-auto"
       >
         <div className="sticky top-0 z-10 bg-white border-b border-[#E2E8F0] px-4 py-3 flex items-center justify-between">
-          <h3 className="font-black text-[#0F172A]">✏️ تعديل {roleLabel}</h3>
+          <h3 className="font-black text-[#0F172A]">✏️ تعديل {roleLabel} <span className="text-[10px] font-bold text-[#1D4ED8]">📱 من التطبيق</span></h3>
           <button
             type="button"
             onClick={onClose}
@@ -2013,18 +2191,26 @@ function WomanMemberEditModal({
             </label>
           )}
           <p className="text-[10px] text-[#B45309] font-bold bg-[#FEF3C7] rounded-lg p-2">
-            ⚠️ سجل حقيقي من شجرة النساء — التعديل يظهر بالتطبيق أيضاً.
+            📱 سجل من التطبيق (آيفون/أندرويد) — أي تعديل أو حذف هنا يظهر بالتطبيق أيضاً.
           </p>
           {error && (
             <div className="bg-red-50 text-red-700 text-xs font-bold rounded-xl p-2.5">{error}</div>
           )}
         </div>
 
-        <div className="sticky bottom-0 bg-white border-t border-[#E2E8F0] px-4 py-3">
+        <div className="sticky bottom-0 bg-white border-t border-[#E2E8F0] px-4 py-3 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={remove}
+            disabled={busy}
+            className="h-11 px-4 rounded-xl bg-red-50 text-red-600 font-black text-sm hover:bg-red-100 disabled:opacity-50"
+          >
+            🗑️ حذف
+          </button>
           <button
             type="submit"
             disabled={busy}
-            className="w-full h-11 rounded-xl bg-[#DB2777] text-white font-black text-sm hover:opacity-90 disabled:opacity-50"
+            className="flex-1 h-11 rounded-xl bg-[#DB2777] text-white font-black text-sm hover:opacity-90 disabled:opacity-50"
           >
             {busy ? "جارٍ الحفظ..." : "💾 حفظ"}
           </button>

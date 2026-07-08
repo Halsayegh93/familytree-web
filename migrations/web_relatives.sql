@@ -62,3 +62,7 @@ create policy "web_relatives_write"
         and p.role in ('owner', 'admin', 'monitor')
     )
   );
+
+-- ربط زوجة من العائلة (سجل women_members) بصف web_relatives — يبقى خاص بالموقع.
+alter table public.web_relatives
+  add column if not exists linked_woman_id uuid references public.women_members(id) on delete set null;

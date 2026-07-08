@@ -161,6 +161,12 @@ export function MemberFullEditClient({
         </div>
 
         <form onSubmit={save} className="p-5 space-y-4">
+          {/* تنبيه: عضو من التطبيق */}
+          <div className="bg-[#EFF6FF] border border-[#BFDBFE] text-[#1D4ED8] text-[11px] font-bold rounded-xl p-2.5 flex items-start gap-1.5">
+            <span>📱</span>
+            <span>هذا عضو من التطبيق — أي تعديل أو حذف هنا يظهر بتطبيق الآيفون والأندرويد.</span>
+          </div>
+
           {/* الصورة الشخصية */}
           <div className="flex flex-col items-center gap-2 pb-1">
             <AvatarEditor
@@ -604,6 +610,9 @@ function ChildrenSection({
               <span className="text-[10px] text-[#94A3B8] font-bold">أضف زوجة أولاً لتظهر هنا كأم</span>
             )}
           </div>
+          <p className="text-[10px] text-[#B45309] font-bold bg-[#FEF3C7] rounded-lg p-2">
+            📱 الابن يُضاف لشجرة العائلة ويظهر بالتطبيق. 🌐 ربط الأم خاص بالموقع فقط.
+          </p>
           <button
             type="button"
             onClick={addSon}
@@ -680,7 +689,7 @@ function DeleteMemberSection({
 
   async function remove() {
     if (hasChildren) return;
-    if (!confirm(`حذف «${memberName}» نهائياً؟ لا يمكن التراجع.`)) return;
+    if (!confirm(`🗑️ حذف «${memberName}» نهائياً؟\n📱 عضو من التطبيق — الحذف يظهر بالآيفون والأندرويد ولا يمكن التراجع.`)) return;
     setBusy(true);
     setErr(null);
     const { error } = await supabase.from("profiles").delete().eq("id", memberId);
