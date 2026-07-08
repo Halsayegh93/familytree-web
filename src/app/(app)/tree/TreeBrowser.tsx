@@ -47,6 +47,7 @@ type ExternalSpouse = {
   nationality: string | null;
   is_deceased: boolean | null;
   notes: string | null;
+  husband_profile_id: string | null;
 };
 
 type WebRelative = {
@@ -771,6 +772,7 @@ function RelationsPanel({
                       externals={externalByWoman.get(d.id) ?? []}
                       canEdit={canEditMembers}
                       childrenOfHer={childrenByFemaleReal.get(d.id) ?? []}
+                      allMembers={allMembers}
                     />
                   ) : null;
                 })()}
@@ -1423,17 +1425,25 @@ function DaughterRow({
   externals,
   canEdit = false,
   childrenOfHer = [],
+  allMembers = [],
 }: {
   daughter: WomanMember;
   internalHusbandName: string | null;
   externals: ExternalSpouse[];
   canEdit?: boolean;
   childrenOfHer?: WebRelative[];
+  allMembers?: Member[];
 }) {
   const ext = externals[0] ?? null;
   const [editing, setEditing] = useState(false);
+  // زوج من العائلة مسجّل بالويب (external_spouses.husband_profile_id)
+  const extFamilyName = ext?.husband_profile_id
+    ? allMembers.find((m) => m.id === ext.husband_profile_id)?.full_name ?? "—"
+    : null;
   const husbandLabel =
-    internalHusbandName ?? (ext ? [ext.full_name || ext.first_name, ext.family_name].filter(Boolean).join(" ") : null);
+    internalHusbandName ??
+    extFamilyName ??
+    (ext ? [ext.full_name || ext.first_name, ext.family_name].filter(Boolean).join(" ") : null);
 
   return (
     <div className="bg-white border border-[#F3D9E6] rounded-xl p-2.5">
@@ -1448,7 +1458,12 @@ function DaughterRow({
           {/* حالة الزواج */}
           {internalHusbandName ? (
             <div className="text-[11px] text-[#357DED] font-bold mt-0.5">
-              💍 الزوج: {internalHusbandName} <span className="text-[#94A3B8]">(من العائلة)</span>
+              💍 الزوج: {internalHusbandName} <span className="text-[#94A3B8]">(من العائلة · التطبيق)</span>
+            </div>
+          ) : extFamilyName ? (
+            <div className="text-[11px] text-[#357DED] font-bold mt-0.5">
+              💍 الزوج: {extFamilyName} <span className="text-[#94A3B8]">(من العائلة · الموقع)</span>
+              {ext?.is_deceased ? " 🕊️" : ""}
             </div>
           ) : ext ? (
             <div className="text-[11px] text-[#9D174D] font-bold mt-0.5">
@@ -1471,9 +1486,14 @@ function DaughterRow({
               ✏️
             </button>
           )}
-          {/* زر إدارة الزوج الخارجي — يظهر فقط إن لم يكن لها زوج من العائلة */}
+          {/* إدارة الزوج (عائلة/خارجي) — يظهر إن لم يكن لها زوج من التطبيق */}
           {!internalHusbandName && (
-            <ExternalHusbandButton womanId={daughter.id} womanName={daughter.full_name} existing={ext} />
+            <ExternalHusbandButton
+              womanId={daughter.id}
+              womanName={daughter.full_name}
+              existing={ext}
+              allMembers={allMembers}
+            />
           )}
         </div>
       </div>
@@ -1503,10 +1523,12 @@ function ExternalHusbandButton({
   womanId,
   womanName,
   existing,
+  allMembers,
 }: {
   womanId: string;
   womanName: string;
   existing: ExternalSpouse | null;
+  allMembers: Member[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -1514,13 +1536,30 @@ function ExternalHusbandButton({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [source, setSource] = useState<"family" | "external">(
+    existing?.husband_profile_id ? "family" : "external"
+  );
+  const [husbandProfileId, setHusbandProfileId] = useState<string | null>(existing?.husband_profile_id ?? null);
+  const [familySearch, setFamilySearch] = useState("");
   const [firstName, setFirstName] = useState(existing?.first_name ?? "");
   const [familyName, setFamilyName] = useState(existing?.family_name ?? "");
   const [nationality, setNationality] = useState(existing?.nationality ?? "");
   const [isDeceased, setIsDeceased] = useState(existing?.is_deceased ?? false);
   const [notes, setNotes] = useState(existing?.notes ?? "");
 
+  const familyMatches = useMemo(() => {
+    if (!familySearch.trim()) return [];
+    const q = familySearch.toLowerCase();
+    return allMembers.filter((m) => m.full_name.toLowerCase().includes(q)).slice(0, 8);
+  }, [familySearch, allMembers]);
+  const chosenFamilyName = husbandProfileId
+    ? allMembers.find((m) => m.id === husbandProfileId)?.full_name
+    : null;
+
   function openModal() {
+    setSource(existing?.husband_profile_id ? "family" : "external");
+    setHusbandProfileId(existing?.husband_profile_id ?? null);
+    setFamilySearch("");
     setFirstName(existing?.first_name ?? "");
     setFamilyName(existing?.family_name ?? "");
     setNationality(existing?.nationality ?? "");
@@ -1532,28 +1571,44 @@ function ExternalHusbandButton({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!firstName.trim()) {
-      setError("الاسم مطلوب");
-      return;
+    let payload: Record<string, any>;
+    if (source === "family") {
+      if (!husbandProfileId || !chosenFamilyName) {
+        setError("اختر الزوج من العائلة");
+        return;
+      }
+      payload = {
+        woman_id: womanId,
+        husband_profile_id: husbandProfileId,
+        first_name: chosenFamilyName,
+        full_name: chosenFamilyName,
+        family_name: null,
+        nationality: null,
+        is_deceased: isDeceased,
+        notes: notes.trim() || null,
+      };
+    } else {
+      if (!firstName.trim()) {
+        setError("الاسم مطلوب");
+        return;
+      }
+      const full = [firstName.trim(), familyName.trim()].filter(Boolean).join(" ");
+      payload = {
+        woman_id: womanId,
+        husband_profile_id: null,
+        first_name: firstName.trim(),
+        full_name: full || firstName.trim(),
+        family_name: familyName.trim() || null,
+        nationality: nationality.trim() || null,
+        is_deceased: isDeceased,
+        notes: notes.trim() || null,
+      };
     }
     setBusy(true);
     setError(null);
-
-    const full = [firstName.trim(), familyName.trim()].filter(Boolean).join(" ");
-    const payload = {
-      woman_id: womanId,
-      first_name: firstName.trim(),
-      full_name: full || firstName.trim(),
-      family_name: familyName.trim() || null,
-      nationality: nationality.trim() || null,
-      is_deceased: isDeceased,
-      notes: notes.trim() || null,
-    };
-
     const { error: err } = existing
       ? await supabase.from("external_spouses").update(payload).eq("id", existing.id)
       : await supabase.from("external_spouses").insert(payload);
-
     if (err) {
       setBusy(false);
       setError("خطأ: " + err.message);
@@ -1566,7 +1621,7 @@ function ExternalHusbandButton({
 
   async function remove() {
     if (!existing) return;
-    if (!confirm("حذف الزوج الخارجي المسجّل؟")) return;
+    if (!confirm("حذف الزوج المسجّل؟")) return;
     setBusy(true);
     const { error: err } = await supabase.from("external_spouses").delete().eq("id", existing.id);
     if (err) {
@@ -1588,9 +1643,9 @@ function ExternalHusbandButton({
             ? "bg-[#FCE7F3] text-[#9D174D] hover:bg-[#FBCFE8]"
             : "bg-[#EC4899] text-white hover:opacity-90"
         }`}
-        title={existing ? "تعديل الزوج الخارجي" : "إضافة زوج من خارج العائلة"}
+        title={existing ? "تعديل الزوج" : "إضافة زوج"}
       >
-        {existing ? "✏️ تعديل" : "➕ زوج خارجي"}
+        {existing ? "✏️ الزوج" : "➕ الزوج"}
       </button>
 
       {open && (
@@ -1600,12 +1655,10 @@ function ExternalHusbandButton({
             className="bg-white rounded-t-3xl md:rounded-3xl w-full md:max-w-md max-h-[92vh] overflow-y-auto"
           >
             {/* header */}
-            <div className="sticky top-0 bg-white border-b border-[#E2E8F0] px-4 py-3 flex items-center justify-between">
+            <div className="sticky top-0 z-10 bg-white border-b border-[#E2E8F0] px-4 py-3 flex items-center justify-between">
               <div>
-                <h3 className="font-black text-[#0F172A]">
-                  {existing ? "تعديل الزوج الخارجي" : "زوج من خارج العائلة"}
-                </h3>
-                <p className="text-[11px] text-[#64748B]">للزوجة: {womanName}</p>
+                <h3 className="font-black text-[#0F172A]">زوج البنت</h3>
+                <p className="text-[11px] text-[#64748B]">لـ: {womanName}</p>
               </div>
               <button
                 type="button"
@@ -1617,50 +1670,87 @@ function ExternalHusbandButton({
             </div>
 
             <div className="p-4 space-y-3">
-              <Field label="الاسم *">
-                <input
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  placeholder="اسم الزوج"
-                  className="ext-input"
-                  autoFocus
-                />
-              </Field>
-              <Field label="اسم العائلة / القبيلة">
-                <input
-                  value={familyName}
-                  onChange={(e) => setFamilyName(e.target.value)}
-                  placeholder="مثال: العتيبي"
-                  className="ext-input"
-                />
-              </Field>
-              <Field label="الجنسية">
-                <input
-                  value={nationality}
-                  onChange={(e) => setNationality(e.target.value)}
-                  placeholder="مثال: كويتي"
-                  className="ext-input"
-                />
-              </Field>
+              {/* اختيار المصدر */}
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setSource("family")}
+                  className={`flex-1 h-9 rounded-lg text-xs font-black transition ${
+                    source === "family" ? "bg-[#357DED] text-white" : "bg-[#F1F5F9] text-[#64748B]"
+                  }`}
+                >
+                  👪 من العائلة
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSource("external")}
+                  className={`flex-1 h-9 rounded-lg text-xs font-black transition ${
+                    source === "external" ? "bg-[#EC4899] text-white" : "bg-[#F1F5F9] text-[#64748B]"
+                  }`}
+                >
+                  🌍 خارج العائلة
+                </button>
+              </div>
+
+              {source === "family" ? (
+                <div>
+                  <span className="text-[11px] font-black text-[#64748B] mb-1 block">اختر الزوج من العائلة *</span>
+                  {chosenFamilyName ? (
+                    <div className="flex items-center justify-between px-3 py-2.5 bg-[#EFF6FF] rounded-xl">
+                      <span className="font-bold text-sm text-[#0F172A] truncate">👪 {chosenFamilyName}</span>
+                      <button type="button" onClick={() => setHusbandProfileId(null)} className="text-[#EF4444] text-xs font-bold flex-shrink-0 mr-2">
+                        تغيير
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <input
+                        value={familySearch}
+                        onChange={(e) => setFamilySearch(e.target.value)}
+                        placeholder="ابحث عن الزوج بالاسم..."
+                        className="ext-input"
+                        autoFocus
+                      />
+                      {familyMatches.length > 0 && (
+                        <div className="absolute top-full mt-1 right-0 left-0 bg-white rounded-xl border border-[#E2E8F0] z-20 max-h-48 overflow-y-auto shadow-xl">
+                          {familyMatches.map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => { setHusbandProfileId(m.id); setFamilySearch(""); }}
+                              className="w-full text-right px-3 py-2 hover:bg-[#F1F5F9] border-b border-[#E2E8F0] last:border-0 text-sm font-bold text-[#0F172A]"
+                            >
+                              {m.full_name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <Field label="الاسم *">
+                    <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="اسم الزوج" className="ext-input" />
+                  </Field>
+                  <Field label="اسم العائلة / القبيلة">
+                    <input value={familyName} onChange={(e) => setFamilyName(e.target.value)} placeholder="مثال: العتيبي" className="ext-input" />
+                  </Field>
+                  <Field label="الجنسية">
+                    <input value={nationality} onChange={(e) => setNationality(e.target.value)} placeholder="مثال: كويتي" className="ext-input" />
+                  </Field>
+                </>
+              )}
+
               <label className="flex items-center gap-2 cursor-pointer select-none py-1">
-                <input
-                  type="checkbox"
-                  checked={isDeceased}
-                  onChange={(e) => setIsDeceased(e.target.checked)}
-                  className="w-4 h-4 accent-[#EC4899]"
-                />
+                <input type="checkbox" checked={isDeceased} onChange={(e) => setIsDeceased(e.target.checked)} className="w-4 h-4 accent-[#EC4899]" />
                 <span className="text-sm font-bold text-[#0F172A]">🕊️ متوفى</span>
               </label>
               <Field label="ملاحظات">
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                  placeholder="أي معلومات إضافية..."
-                  className="ext-input resize-none"
-                />
+                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="أي معلومات إضافية..." className="ext-input resize-none" />
               </Field>
 
+              <p className="text-[10px] text-[#94A3B8] font-bold">🌐 خاص بالموقع — لا يظهر بتطبيق الآيفون/الأندرويد</p>
               {error && (
                 <div className="bg-red-50 text-red-700 text-xs font-bold rounded-xl p-2.5">{error}</div>
               )}
@@ -1683,7 +1773,7 @@ function ExternalHusbandButton({
                 disabled={busy}
                 className="flex-1 h-11 rounded-xl bg-[#EC4899] text-white font-black text-sm hover:opacity-90 disabled:opacity-50"
               >
-                {busy ? "جارٍ الحفظ..." : existing ? "حفظ التعديلات" : "إضافة"}
+                {busy ? "جارٍ الحفظ..." : existing ? "حفظ" : "إضافة"}
               </button>
             </div>
           </form>

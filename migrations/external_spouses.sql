@@ -65,3 +65,7 @@ create policy "external_spouses_write_mods"
         and p.role in ('owner', 'admin', 'monitor', 'supervisor')
     )
   );
+
+-- دعم ربط زوج من العائلة (سجل profiles) لبنت حقيقية (women_members) — يبقى خاص بالموقع.
+alter table public.external_spouses
+  add column if not exists husband_profile_id uuid references public.profiles(id) on delete set null;

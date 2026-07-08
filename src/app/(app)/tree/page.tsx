@@ -44,7 +44,7 @@ export default async function TreePage() {
         .limit(10000),
       supabase
         .from("external_spouses")
-        .select("id, woman_id, first_name, full_name, family_name, nationality, is_deceased, notes"),
+        .select("id, woman_id, first_name, full_name, family_name, nationality, is_deceased, notes, husband_profile_id"),
       supabase
         .from("web_relatives")
         .select("id, man_id, kind, name, child_profile_id, mother_rel_id, mother_name, linked_woman_id, parent_rel_id, parent_woman_id, is_deceased, husband_type, husband_profile_id, husband_name, husband_family, husband_nationality, husband_deceased, notes")
@@ -108,6 +108,7 @@ type ExternalSpouseRow = {
   nationality: string | null;
   is_deceased: boolean | null;
   notes: string | null;
+  husband_profile_id: string | null;
 };
 
 type WebRelativeRow = {
