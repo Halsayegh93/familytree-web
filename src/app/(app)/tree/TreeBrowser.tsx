@@ -58,6 +58,8 @@ type WebRelative = {
   mother_rel_id: string | null;
   mother_name: string | null;
   linked_woman_id: string | null;
+  parent_rel_id: string | null;
+  parent_woman_id: string | null;
   is_deceased: boolean | null;
   husband_type: "family" | "external" | null;
   husband_profile_id: string | null;
@@ -187,6 +189,31 @@ export function TreeBrowser({
     const m = new Map<string, WebRelative>();
     webRelatives.forEach((r) => {
       if (r.kind === "son" && r.child_profile_id) m.set(r.child_profile_id, r);
+    });
+    return m;
+  }, [webRelatives]);
+
+  // أبناء الإناث المتزوجات (خاص بالموقع) — مفهرسة حسب الأم (web daughter أو women_members)
+  const childrenByFemaleWeb = useMemo(() => {
+    const m = new Map<string, WebRelative[]>();
+    webRelatives.forEach((r) => {
+      if (r.parent_rel_id) {
+        const arr = m.get(r.parent_rel_id) ?? [];
+        arr.push(r);
+        m.set(r.parent_rel_id, arr);
+      }
+    });
+    return m;
+  }, [webRelatives]);
+
+  const childrenByFemaleReal = useMemo(() => {
+    const m = new Map<string, WebRelative[]>();
+    webRelatives.forEach((r) => {
+      if (r.parent_woman_id) {
+        const arr = m.get(r.parent_woman_id) ?? [];
+        arr.push(r);
+        m.set(r.parent_woman_id, arr);
+      }
     });
     return m;
   }, [webRelatives]);
@@ -489,6 +516,8 @@ export function TreeBrowser({
               allMembers={members}
               internalHusbandName={internalHusbandName}
               externalByWoman={externalByWoman}
+              childrenByFemaleWeb={childrenByFemaleWeb}
+              childrenByFemaleReal={childrenByFemaleReal}
               canEditMembers={canEditMembers}
               onFocus={focus}
               childrenCountOf={(id) => childrenByFather.get(id)?.length ?? 0}
@@ -571,6 +600,8 @@ function RelationsPanel({
   allMembers,
   internalHusbandName,
   externalByWoman,
+  childrenByFemaleWeb,
+  childrenByFemaleReal,
   canEditMembers,
   onFocus,
   childrenCountOf,
@@ -588,6 +619,8 @@ function RelationsPanel({
   allMembers: Member[];
   internalHusbandName: (husbandId: string | null) => string | null;
   externalByWoman: Map<string, ExternalSpouse[]>;
+  childrenByFemaleWeb: Map<string, WebRelative[]>;
+  childrenByFemaleReal: Map<string, WebRelative[]>;
   canEditMembers: boolean;
   onFocus: (id: string) => void;
   childrenCountOf: (id: string) => number;
@@ -600,9 +633,10 @@ function RelationsPanel({
 
   return (
     <div className="space-y-2">
-      <div className="bg-[#FDF2F8] border border-[#FBCFE8] rounded-2xl px-3 py-2 text-[11px] text-[#9D174D] font-bold flex items-center gap-1.5">
-        <span>🔒</span>
-        <span>مكان تعديل العلاقات عند العضو. الإضافات 🌐 خاصة بالموقع؛ سجلات 📱 من التطبيق (تعديلها/حذفها يظهر بالتطبيق).</span>
+      <div className="bg-[#FDF2F8] border border-[#FBCFE8] rounded-2xl px-3 py-2 space-y-1">
+        <div className="text-[11px] text-[#9D174D] font-black">🔒 لوحة العلاقات — للمدراء فقط، ومكان تعديل العلاقات عند العضو.</div>
+        <div className="text-[10px] text-[#1D4ED8] font-bold">📱 من التطبيق = يظهر بالويب <b>والتطبيق</b> (آيفون/أندرويد). أي تعديل أو حذف <b>يظهر بالتطبيق</b>.</div>
+        <div className="text-[10px] text-[#9D174D] font-bold">🌐 من الموقع = يظهر <b>بالويب فقط</b>، لا يظهر ولا يتأثر بالتطبيق.</div>
       </div>
 
       {nothing && (
@@ -675,7 +709,7 @@ function RelationsPanel({
           }
         >
           <div className="space-y-1.5">
-            {/* بنات التطبيق (women_members) — عرض فقط */}
+            {/* بنات التطبيق (women_members) */}
             {daughters.map((d) => (
               <DaughterRow
                 key={d.id}
@@ -683,6 +717,7 @@ function RelationsPanel({
                 internalHusbandName={internalHusbandName(d.husband_id)}
                 externals={externalByWoman.get(d.id) ?? []}
                 canEdit={canEditMembers}
+                childrenOfHer={childrenByFemaleReal.get(d.id) ?? []}
               />
             ))}
             {/* بنات الطبقة الويب — قابلة للتعديل */}
@@ -694,6 +729,7 @@ function RelationsPanel({
                 wifeOptions={wifeOptions}
                 allMembers={allMembers}
                 canEdit={canEditMembers}
+                childrenOfHer={childrenByFemaleWeb.get(d.id) ?? []}
               />
             ))}
             {totalDaughters === 0 && (
@@ -725,12 +761,14 @@ function WebDaughterRow({
   wifeOptions,
   allMembers,
   canEdit,
+  childrenOfHer,
 }: {
   daughter: WebRelative;
   manId: string;
   wifeOptions: WifeOption[];
   allMembers: Member[];
   canEdit: boolean;
+  childrenOfHer: WebRelative[];
 }) {
   const [editing, setEditing] = useState(false);
   const husbandName =
@@ -782,6 +820,14 @@ function WebDaughterRow({
       {daughter.notes && (
         <div className="text-[11px] text-[#64748B] mt-1.5 pr-14 whitespace-pre-wrap">📝 {daughter.notes}</div>
       )}
+      {/* أبناؤها — خاص بالموقع */}
+      <FemaleChildren
+        parentRelId={daughter.id}
+        parentWomanId={null}
+        parentName={daughter.name ?? ""}
+        childrenOfHer={childrenOfHer}
+        canEdit={canEdit}
+      />
       {editing && (
         <DaughterModal
           manId={manId}
@@ -790,6 +836,172 @@ function WebDaughterRow({
           allMembers={allMembers}
           onClose={() => setEditing(false)}
         />
+      )}
+    </div>
+  );
+}
+
+// ═══════════ أبناء الأنثى المتزوجة (خاص بالموقع) ═══════════
+function FemaleChildren({
+  parentRelId,
+  parentWomanId,
+  parentName,
+  childrenOfHer,
+  canEdit,
+}: {
+  parentRelId: string | null;
+  parentWomanId: string | null;
+  parentName: string;
+  childrenOfHer: WebRelative[];
+  canEdit: boolean;
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [gender, setGender] = useState<"son" | "daughter">("son");
+  const [deceased, setDeceased] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  if (childrenOfHer.length === 0 && !canEdit) return null;
+
+  function resetForm() {
+    setName("");
+    setGender("son");
+    setDeceased(false);
+    setEditId(null);
+    setErr(null);
+  }
+
+  async function saveChild() {
+    if (!name.trim()) return;
+    setBusy(true);
+    setErr(null);
+    const payload = {
+      kind: gender,
+      name: name.trim(),
+      is_deceased: deceased,
+      parent_rel_id: parentRelId,
+      parent_woman_id: parentWomanId,
+      man_id: null,
+    };
+    const { error } = editId
+      ? await supabase.from("web_relatives").update(payload).eq("id", editId)
+      : await supabase.from("web_relatives").insert(payload);
+    setBusy(false);
+    if (error) return setErr("خطأ: " + error.message);
+    resetForm();
+    router.refresh();
+  }
+
+  async function removeChild(id: string, nm: string | null) {
+    if (!confirm(`حذف «${nm}»؟`)) return;
+    setBusy(true);
+    const { error } = await supabase.from("web_relatives").delete().eq("id", id);
+    setBusy(false);
+    if (error) return setErr("خطأ: " + error.message);
+    if (editId === id) resetForm();
+    router.refresh();
+  }
+
+  return (
+    <div className="mt-1.5 border-t border-[#F3D9E6] pt-1.5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-[11px] font-black text-[#0EA5E9] hover:underline"
+      >
+        👶 أبناؤها {childrenOfHer.length > 0 ? `(${childrenOfHer.length})` : ""} {open ? "▲" : "▼"}
+      </button>
+
+      {open && (
+        <div className="mt-1.5 space-y-1.5">
+          {childrenOfHer.map((c) => (
+            <div key={c.id} className="flex items-center gap-2 bg-[#F0F9FF] rounded-lg px-2 py-1.5">
+              <span className="text-sm">{c.kind === "daughter" ? "👧" : "👦"}</span>
+              <span className="flex-1 min-w-0 font-bold text-xs text-[#0F172A] truncate">
+                {c.name}
+                {c.is_deceased && <span className="mr-1">🕊️</span>}
+              </span>
+              {canEdit && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditId(c.id);
+                      setName(c.name ?? "");
+                      setGender(c.kind === "daughter" ? "daughter" : "son");
+                      setDeceased(c.is_deceased ?? false);
+                    }}
+                    className="text-[10px] font-black text-[#0EA5E9]"
+                  >
+                    تعديل
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeChild(c.id, c.name)}
+                    className="text-[10px] font-black text-[#EF4444]"
+                  >
+                    حذف
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+
+          {canEdit && (
+            <div className="bg-[#F0F9FF] border border-[#BAE6FD] rounded-lg p-2 space-y-1.5">
+              <div className="text-[10px] font-black text-[#0369A1]">
+                {editId ? "تعديل ابن" : `➕ إضافة ابن لـ ${parentName}`}
+              </div>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="الاسم"
+                className="w-full px-2.5 py-2 bg-white rounded-lg outline-none focus:ring-2 focus:ring-[#0EA5E9] text-xs"
+              />
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setGender("son")}
+                  className={`flex-1 h-8 rounded-lg text-[11px] font-black ${gender === "son" ? "bg-[#357DED] text-white" : "bg-white text-[#64748B]"}`}
+                >
+                  👦 ابن
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGender("daughter")}
+                  className={`flex-1 h-8 rounded-lg text-[11px] font-black ${gender === "daughter" ? "bg-[#EC4899] text-white" : "bg-white text-[#64748B]"}`}
+                >
+                  👧 بنت
+                </button>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer text-[11px] font-bold text-[#0F172A]">
+                <input type="checkbox" checked={deceased} onChange={(e) => setDeceased(e.target.checked)} className="w-3.5 h-3.5 accent-[#0EA5E9]" />
+                🕊️ متوفى
+              </label>
+              <div className="flex gap-1.5">
+                {editId && (
+                  <button type="button" onClick={resetForm} className="h-8 px-3 rounded-lg bg-white text-[#64748B] text-[11px] font-black">
+                    إلغاء
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={saveChild}
+                  disabled={busy || !name.trim()}
+                  className="flex-1 h-8 rounded-lg bg-[#0EA5E9] text-white text-[11px] font-black disabled:opacity-50"
+                >
+                  {busy ? "..." : editId ? "حفظ" : "إضافة"}
+                </button>
+              </div>
+              <p className="text-[9px] text-[#94A3B8] font-bold">🌐 خاص بالموقع — لا يظهر بالتطبيق</p>
+              {err && <p className="text-[10px] text-red-600 font-bold">{err}</p>}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -1136,11 +1348,13 @@ function DaughterRow({
   internalHusbandName,
   externals,
   canEdit = false,
+  childrenOfHer = [],
 }: {
   daughter: WomanMember;
   internalHusbandName: string | null;
   externals: ExternalSpouse[];
   canEdit?: boolean;
+  childrenOfHer?: WebRelative[];
 }) {
   const ext = externals[0] ?? null;
   const [editing, setEditing] = useState(false);
@@ -1192,6 +1406,14 @@ function DaughterRow({
           📝 {ext.notes}
         </div>
       )}
+      {/* أبناؤها — خاص بالموقع */}
+      <FemaleChildren
+        parentRelId={null}
+        parentWomanId={daughter.id}
+        parentName={daughter.full_name}
+        childrenOfHer={childrenOfHer}
+        canEdit={canEdit}
+      />
       {editing && (
         <WomanMemberEditModal woman={daughter} role="daughter" onClose={() => setEditing(false)} />
       )}

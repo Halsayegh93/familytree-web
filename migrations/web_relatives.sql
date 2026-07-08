@@ -66,3 +66,13 @@ create policy "web_relatives_write"
 -- ربط زوجة من العائلة (سجل women_members) بصف web_relatives — يبقى خاص بالموقع.
 alter table public.web_relatives
   add column if not exists linked_woman_id uuid references public.women_members(id) on delete set null;
+
+-- دعم أبناء الإناث المتزوجات (خاص بالموقع فقط):
+-- طفل الأنثى = صف web_relatives بأب = صف أنثى (web daughter) أو سجل women_members.
+alter table public.web_relatives alter column man_id drop not null;
+alter table public.web_relatives
+  add column if not exists parent_rel_id uuid references public.web_relatives(id) on delete cascade;
+alter table public.web_relatives
+  add column if not exists parent_woman_id uuid references public.women_members(id) on delete cascade;
+create index if not exists idx_web_relatives_parent_rel on public.web_relatives(parent_rel_id);
+create index if not exists idx_web_relatives_parent_woman on public.web_relatives(parent_woman_id);
