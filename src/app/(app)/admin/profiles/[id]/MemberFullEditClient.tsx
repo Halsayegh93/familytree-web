@@ -15,7 +15,7 @@ type ChildLite = {
   sort_order: number | null;
 };
 type WifeOpt = { id: string; name: string; webId: string | null };
-type SonMother = { mother_name: string | null };
+type SonMother = { id: string; mother_name: string | null };
 
 export function MemberFullEditClient({
   member,
@@ -627,11 +627,9 @@ function ChildrenSection({
 
       {childrenList.length > 0 && (
         <div className="space-y-1">
-          {childrenList.map((c) => {
-            const motherOfChild = sonMotherByChild?.get(c.id)?.mother_name ?? null;
-            return (
+          {childrenList.map((c) => (
+            <div key={c.id} className="bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] p-2">
               <button
-                key={c.id}
                 type="button"
                 onClick={() => {
                   if (onNavigate) {
@@ -639,7 +637,7 @@ function ChildrenSection({
                     onNavigate(c.id);
                   }
                 }}
-                className="w-full flex items-center gap-2.5 p-2 bg-[#F8FAFC] rounded-xl hover:bg-[#EFF6FF] transition text-right border border-[#E2E8F0]"
+                className="w-full flex items-center gap-2.5 text-right"
               >
                 <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#357DED] to-[#10B981] text-white flex items-center justify-center font-black text-sm overflow-hidden flex-shrink-0">
                   {c.avatar_url ? (
@@ -649,22 +647,83 @@ function ChildrenSection({
                     c.first_name.charAt(0)
                   )}
                 </div>
-                <span className="flex-1 min-w-0 text-right">
-                  <span className="block font-bold text-sm text-[#0F172A] truncate">
-                    {c.first_name}
-                    {c.is_deceased && <span className="mr-1 text-[11px]">🕊️</span>}
-                  </span>
-                  {motherOfChild && (
-                    <span className="block text-[10px] font-black text-[#DB2777] truncate">
-                      👩 الأم: {motherOfChild}
-                    </span>
-                  )}
+                <span className="flex-1 min-w-0 font-bold text-sm text-[#0F172A] truncate">
+                  {c.first_name}
+                  {c.is_deceased && <span className="mr-1 text-[11px]">🕊️</span>}
                 </span>
                 {onNavigate && <span className="text-[#94A3B8] text-xs flex-shrink-0">تعديل ←</span>}
               </button>
-            );
-          })}
+              {/* ربط الأم (طبقة ويب) */}
+              <SonMotherSelect
+                childId={c.id}
+                manId={parent.id}
+                wifeOptions={wifeOptions}
+                existing={sonMotherByChild?.get(c.id) ?? null}
+              />
+            </div>
+          ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ربط ابن موجود بأمه (يكتب على web_relatives — خاص بالموقع)
+function SonMotherSelect({
+  childId,
+  manId,
+  wifeOptions,
+  existing,
+}: {
+  childId: string;
+  manId: string;
+  wifeOptions: WifeOpt[];
+  existing: SonMother | null;
+}) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const current = existing?.mother_name ?? "";
+
+  async function change(value: string) {
+    setBusy(true);
+    if (!value) {
+      // إزالة الربط
+      if (existing) await supabase.from("web_relatives").delete().eq("id", existing.id);
+    } else if (existing) {
+      await supabase.from("web_relatives").update({ mother_name: value }).eq("id", existing.id);
+    } else {
+      await supabase.from("web_relatives").insert({
+        man_id: manId,
+        kind: "son",
+        child_profile_id: childId,
+        mother_name: value,
+      });
+    }
+    setBusy(false);
+    router.refresh();
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-[#E2E8F0]">
+      <span className="text-[10px] font-black text-[#DB2777] flex-shrink-0">👩 الأم:</span>
+      <select
+        value={current}
+        disabled={busy}
+        onChange={(e) => change(e.target.value)}
+        className="flex-1 min-w-0 px-2 py-1.5 bg-white rounded-lg outline-none focus:ring-2 focus:ring-[#EC4899] text-xs font-bold disabled:opacity-50"
+      >
+        <option value="">— بدون —</option>
+        {/* أبقِ القيمة الحالية حتى لو ما كانت ضمن الزوجات الحالية */}
+        {current && !wifeOptions.some((w) => w.name === current) && (
+          <option value={current}>{current}</option>
+        )}
+        {wifeOptions.map((w) => (
+          <option key={w.id} value={w.name}>{w.name}</option>
+        ))}
+      </select>
+      {wifeOptions.length === 0 && !current && (
+        <span className="text-[9px] text-[#94A3B8] font-bold flex-shrink-0">أضف زوجة أولاً</span>
       )}
     </div>
   );
