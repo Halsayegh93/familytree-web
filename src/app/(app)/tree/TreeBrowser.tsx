@@ -526,10 +526,6 @@ export function TreeBrowser({
             <RelationsPanel
               focused={focused}
               mother={mother}
-              wives={wives}
-              webWives={webWives}
-              familyWomen={familyWomen}
-              motherNamesInUse={motherNamesInUse}
               sons={directChildren}
               daughters={daughters}
               webDaughters={webDaughters}
@@ -610,10 +606,6 @@ function TabButton({
 function RelationsPanel({
   focused,
   mother,
-  wives,
-  webWives,
-  familyWomen,
-  motherNamesInUse,
   sons,
   daughters,
   webDaughters,
@@ -629,10 +621,6 @@ function RelationsPanel({
 }: {
   focused: Member;
   mother: WomanMember | null;
-  wives: WomanMember[];
-  webWives: WebRelative[];
-  familyWomen: WomanMember[];
-  motherNamesInUse: Set<string>;
   sons: Member[];
   daughters: WomanMember[];
   webDaughters: WebRelative[];
@@ -649,9 +637,8 @@ function RelationsPanel({
   const [addingDaughter, setAddingDaughter] = useState(false);
   const [selDaughter, setSelDaughter] = useState<{ id: string; source: "app" | "web" } | null>(null);
   const totalDaughters = daughters.length + webDaughters.length;
-  const totalWives = wives.length + webWives.length;
   const nothing =
-    !mother && sons.length === 0 && totalDaughters === 0 && totalWives === 0 && !canEditMembers;
+    !mother && sons.length === 0 && totalDaughters === 0 && !canEditMembers;
 
   return (
     <div className="space-y-2">
@@ -666,20 +653,6 @@ function RelationsPanel({
           <div className="text-3xl mb-1">🔗</div>
           <p className="text-[#0F172A] font-bold text-sm">لا توجد علاقات مسجّلة لهذا العضو</p>
         </div>
-      )}
-
-      {/* الزوجات — مكان التعديل عند العضو */}
-      {(totalWives > 0 || canEditMembers) && (
-        <Section title="الزوجات" count={totalWives} icon="💍" color="#DB2777" compact>
-          <WivesInline
-            husbandId={focused.id}
-            wives={wives}
-            webWives={webWives}
-            canEdit={canEditMembers}
-            motherNamesInUse={motherNamesInUse}
-            familyWomen={familyWomen}
-          />
-        </Section>
       )}
 
       {/* الأم */}
