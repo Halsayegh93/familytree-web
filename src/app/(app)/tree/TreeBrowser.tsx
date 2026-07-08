@@ -978,7 +978,7 @@ function FemaleChildren({
     setBusy(true);
     setErr(null);
 
-    if (linkToApp && !editId) {
+    if (linkToApp) {
       // 📱 ربط بالتطبيق — الطفل يصير عضواً حقيقياً (تحت أبيه إن كان من العائلة، وإلا بدون أب)
       const underFather = husbandProfileId ? `تحت أبيه «${husbandLabel}»` : "كعضو حقيقي (أبوه خارج العائلة — يُعرَّف باسم أمه)";
       if (!confirm(`🔗 ربط «${name.trim()}» بالتطبيق ${underFather}؟ راح يظهر بالآيفون/الأندرويد.`)) {
@@ -1007,17 +1007,20 @@ function FemaleChildren({
         setBusy(false);
         return setErr("خطأ: " + error.message);
       }
-      // نربط العضو الجديد بأمه (اسم البنت) ونُبقيه ظاهراً في «أبناؤها» بعلامة 📱
-      if (ins?.id) {
-        await supabase.from("web_relatives").insert({
-          kind: gender,
-          name: name.trim(),
-          child_profile_id: ins.id,
-          mother_name: parentName,
-          parent_rel_id: parentRelId,
-          parent_woman_id: parentWomanId,
-          man_id: husbandProfileId ?? null,
-        });
+      const rel = {
+        kind: gender,
+        name: name.trim(),
+        child_profile_id: ins?.id ?? null,
+        mother_name: parentName,
+        parent_rel_id: parentRelId,
+        parent_woman_id: parentWomanId,
+        man_id: husbandProfileId ?? null,
+      };
+      // عند التعديل: نحوّل الصف الموجود (خاص بالموقع) إلى مربوط بالتطبيق؛ وإلا نُضيف صفاً جديداً
+      if (editId) {
+        await supabase.from("web_relatives").update(rel).eq("id", editId);
+      } else if (ins?.id) {
+        await supabase.from("web_relatives").insert(rel);
       }
       setBusy(false);
       resetForm();
@@ -1094,6 +1097,8 @@ function FemaleChildren({
                       setName(c.name ?? "");
                       setGender(c.kind === "daughter" ? "daughter" : "son");
                       setDeceased(c.is_deceased ?? false);
+                      setLinkToApp(false);
+                      setChildPhone("");
                     }}
                     className="text-[10px] font-black text-[#0EA5E9]"
                   >
@@ -1142,8 +1147,8 @@ function FemaleChildren({
                 <input type="checkbox" checked={deceased} onChange={(e) => setDeceased(e.target.checked)} className="w-3.5 h-3.5 accent-[#0EA5E9]" />
                 🕊️ متوفى
               </label>
-              {/* ربط بالتطبيق — عند الإضافة (عضو حقيقي يقدر يدخل بالهاتف) */}
-              {canLinkToApp && !editId ? (
+              {/* ربط بالتطبيق — عند الإضافة أو التعديل (عضو حقيقي يقدر يدخل بالهاتف) */}
+              {canLinkToApp ? (
                 <>
                   <label
                     className={`flex items-center gap-2 cursor-pointer text-[10px] font-black p-1.5 rounded-lg border ${
@@ -1155,6 +1160,8 @@ function FemaleChildren({
                       ? husbandProfileId
                         ? "📱 عضو حقيقي (تحت أبيه بالشجرة)"
                         : "📱 عضو حقيقي (أبوه خارجي — بدون أب بالشجرة)"
+                      : editId
+                      ? "🌐 خاص بالموقع (علّم للربط بالتطبيق)"
                       : "🌐 خاص بالموقع فقط"}
                   </label>
                   {linkToApp && (
