@@ -305,6 +305,24 @@ export function TreeBrowser({
     [women]
   );
 
+  // أم العضو المحوري = إحدى زوجات أبيه (من التطبيق أو الويب)
+  const myMotherOptions = useMemo<WifeOption[]>(() => {
+    if (!focused?.father_id) return [];
+    const opts: WifeOption[] = [];
+    (wivesByHusband.get(focused.father_id) ?? []).forEach((w) =>
+      opts.push({ id: w.id, name: w.full_name, webId: null })
+    );
+    (webWivesByMan.get(focused.father_id) ?? []).forEach((w) =>
+      opts.push({ id: w.id, name: w.name ?? "", webId: w.id })
+    );
+    return opts.filter((o) => o.name.trim());
+  }, [focused, wivesByHusband, webWivesByMan]);
+
+  const myMotherLink = useMemo<WebRelative | null>(
+    () => (focused ? webSonMotherByChild.get(focused.id) ?? null : null),
+    [focused, webSonMotherByChild]
+  );
+
   // أسماء الأمهات المرتبطة بأبناء/بنات هذا العضو (للتحذير قبل حذف الزوجة)
   const motherNamesInUse = useMemo<Set<string>>(() => {
     const s = new Set<string>();
@@ -478,6 +496,8 @@ export function TreeBrowser({
             sonMotherByChild={webSonMotherByChild}
             motherNamesInUse={motherNamesInUse}
             familyWomen={familyWomen}
+            myMotherOptions={myMotherOptions}
+            myMotherLink={myMotherLink}
           />
 
           {/* ═══════ التابات (العلاقات — للمدراء فقط) ═══════ */}
@@ -635,10 +655,10 @@ function RelationsPanel({
 
   return (
     <div className="space-y-2">
-      <div className="bg-[#FDF2F8] border border-[#FBCFE8] rounded-2xl px-3 py-2 space-y-1">
-        <div className="text-[11px] text-[#9D174D] font-black">🔒 لوحة العلاقات — للمدراء فقط، ومكان تعديل العلاقات عند العضو.</div>
-        <div className="text-[10px] text-[#1D4ED8] font-bold">📱 من التطبيق = يظهر بالويب <b>والتطبيق</b> (آيفون/أندرويد). أي تعديل أو حذف <b>يظهر بالتطبيق</b>.</div>
-        <div className="text-[10px] text-[#9D174D] font-bold">🌐 من الموقع = يظهر <b>بالويب فقط</b>، لا يظهر ولا يتأثر بالتطبيق.</div>
+      <div className="bg-[#FDF2F8] border border-[#FBCFE8] rounded-xl px-3 py-1.5 text-[10px] font-bold text-[#9D174D] flex items-center justify-center gap-3">
+        <span>🔒 للمدراء فقط</span>
+        <span className="text-[#1D4ED8]">📱 يظهر بالتطبيق</span>
+        <span>🌐 الموقع فقط</span>
       </div>
 
       {nothing && (
@@ -848,9 +868,11 @@ function WebDaughterRow({
         <div className="flex-1 min-w-0">
           <div className="font-black text-sm text-[#0F172A] truncate">
             {daughter.name}
-            {daughter.is_deceased && <span className="mr-1 text-[11px] text-[#6B7B8D]">🕊️</span>}
           </div>
-          <SourceBadge kind="web" />
+          <div className="flex items-center gap-1 flex-wrap mt-0.5">
+            <SourceBadge kind="web" />
+            <StatusPill deceased={daughter.is_deceased} />
+          </div>
           {daughter.mother_name && (
             <div className="text-[11px] text-[#DB2777] font-bold mt-0.5">👩 الأم: {daughter.mother_name}</div>
           )}
@@ -1452,9 +1474,11 @@ function DaughterRow({
         <div className="flex-1 min-w-0">
           <div className="font-black text-sm text-[#0F172A] truncate">
             {daughter.full_name}
-            {daughter.is_deceased && <span className="mr-1 text-[11px] text-[#6B7B8D]">🕊️</span>}
           </div>
-          <SourceBadge kind="app" />
+          <div className="flex items-center gap-1 flex-wrap mt-0.5">
+            <SourceBadge kind="app" />
+            <StatusPill deceased={daughter.is_deceased} />
+          </div>
           {/* حالة الزواج */}
           {internalHusbandName ? (
             <div className="text-[11px] text-[#357DED] font-bold mt-0.5">
@@ -1837,6 +1861,19 @@ function Avatar({
   );
 }
 
+// شارة الحالة: نشطة / متوفاة
+function StatusPill({ deceased }: { deceased: boolean | null }) {
+  return deceased ? (
+    <span className="inline-flex items-center px-1.5 py-0 rounded-full text-[9px] font-black bg-[#6B7B8D]/15 text-[#6B7B8D]">
+      🕊️ متوفاة
+    </span>
+  ) : (
+    <span className="inline-flex items-center px-1.5 py-0 rounded-full text-[9px] font-black bg-[#10B981]/15 text-[#059669]">
+      ✅ على قيد الحياة
+    </span>
+  );
+}
+
 // شارة مصدر السجل: من التطبيق (بيانات مشتركة) أو من الموقع (خاص)
 function SourceBadge({ kind }: { kind: "app" | "web" }) {
   return kind === "app" ? (
@@ -1945,6 +1982,8 @@ function FocusedMemberCard({
   sonMotherByChild,
   motherNamesInUse,
   familyWomen,
+  myMotherOptions,
+  myMotherLink,
 }: {
   member: Member;
   generation: number;
@@ -1967,6 +2006,8 @@ function FocusedMemberCard({
   sonMotherByChild: Map<string, WebRelative>;
   motherNamesInUse: Set<string>;
   familyWomen: WomanMember[];
+  myMotherOptions: WifeOption[];
+  myMotherLink: WebRelative | null;
 }) {
   const [siblingsOpen, setSiblingsOpen] = useState(false);
   const roleColor = roleColorOf(member.role);
@@ -2126,6 +2167,16 @@ function FocusedMemberCard({
               canEdit={canEditMembers}
               motherNamesInUse={motherNamesInUse}
               familyWomen={familyWomen}
+            />
+          )}
+
+          {/* أم العضو — اختيار من زوجات أبيه */}
+          {canEditMembers && member.father_id && (
+            <MemberMotherSelect
+              childId={member.id}
+              fatherId={member.father_id}
+              options={myMotherOptions}
+              existing={myMotherLink}
             />
           )}
         </div>
@@ -2467,6 +2518,67 @@ function WifeModal({
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+// اختيار أم العضو من زوجات أبيه (يكتب على web_relatives — خاص بالموقع)
+function MemberMotherSelect({
+  childId,
+  fatherId,
+  options,
+  existing,
+}: {
+  childId: string;
+  fatherId: string;
+  options: WifeOption[];
+  existing: WebRelative | null;
+}) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const current = existing?.mother_name ?? "";
+
+  async function change(value: string) {
+    setBusy(true);
+    if (!value) {
+      if (existing) await supabase.from("web_relatives").delete().eq("id", existing.id);
+    } else if (existing) {
+      await supabase.from("web_relatives").update({ mother_name: value }).eq("id", existing.id);
+    } else {
+      await supabase.from("web_relatives").insert({
+        man_id: fatherId,
+        kind: "son",
+        child_profile_id: childId,
+        mother_name: value,
+      });
+    }
+    setBusy(false);
+    router.refresh();
+  }
+
+  return (
+    <div className="mt-2 flex items-center gap-1 flex-wrap">
+      <span className="text-[10px] font-black text-[#DB2777] opacity-80">👩 الأم:</span>
+      {options.length === 0 ? (
+        <span className="text-[10px] text-[#94A3B8] font-bold">سجّل زوجات لأبيه أولاً</span>
+      ) : (
+        <select
+          value={current}
+          disabled={busy}
+          onChange={(e) => change(e.target.value)}
+          className="px-2 py-1 bg-[#FCE7F3] rounded-lg outline-none focus:ring-2 focus:ring-[#EC4899] text-[10px] font-black text-[#9D174D] disabled:opacity-50"
+        >
+          <option value="">— بدون —</option>
+          {current && !options.some((o) => o.name === current) && (
+            <option value={current}>{current}</option>
+          )}
+          {options.map((o) => (
+            <option key={o.id} value={o.name}>{o.name}</option>
+          ))}
+        </select>
+      )}
+      <span className="text-[9px] text-[#94A3B8] font-bold">🌐</span>
     </div>
   );
 }

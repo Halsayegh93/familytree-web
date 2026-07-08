@@ -84,7 +84,6 @@ export function MemberFullEditClient({
     const updates: Record<string, any> = {
       first_name: firstName.trim(),
       full_name: fullName.trim(),
-      phone_number: phoneNumber.trim() || null,
       birth_date: birthDate || null,
       death_date: isDeceased ? (deathDate || null) : null,
       is_deceased: isDeceased,
@@ -94,6 +93,14 @@ export function MemberFullEditClient({
       is_married: isMarried,
       status,
     };
+
+    // نرسل رقم الهاتف فقط إذا تغيّر فعلاً — إعادة إرساله بدون تغيير تُشغّل
+    // مُطبّع الهاتف في القاعدة الذي يُفسد الرقم المخزّن (يضيف + مكرّر) ويكسر قيد الصيغة.
+    const newPhone = phoneNumber.trim() || null;
+    const oldPhone = member.phone_number || null;
+    if (newPhone !== oldPhone) {
+      updates.phone_number = newPhone;
+    }
 
     if (canManageRoles) {
       updates.role = role;
