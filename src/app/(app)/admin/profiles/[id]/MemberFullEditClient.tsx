@@ -523,6 +523,8 @@ function ChildrenSection({
   const [adding, setAdding] = useState(false);
   const [sonName, setSonName] = useState("");
   const [motherName, setMotherName] = useState("");
+  const [sonMarried, setSonMarried] = useState(false);
+  const [linkToApp, setLinkToApp] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -532,6 +534,26 @@ function ChildrenSection({
     if (!first) return;
     setBusy(true);
     setErr(null);
+
+    if (!linkToApp) {
+      // 🌐 ابن خاص بالموقع — web_relatives (لا يظهر بالتطبيق)
+      const { error } = await supabase.from("web_relatives").insert({
+        man_id: parent.id,
+        kind: "son",
+        name: first,
+        is_married: sonMarried,
+        is_deceased: false,
+        mother_name: motherName.trim() || null,
+      });
+      setBusy(false);
+      if (error) return setErr("خطأ: " + error.message);
+      setSonName("");
+      setMotherName("");
+      setSonMarried(false);
+      setAdding(false);
+      router.refresh();
+      return;
+    }
 
     const maxSort = childrenList.reduce((mx, c) => Math.max(mx, c.sort_order ?? 0), 0);
     const { data: inserted, error } = await supabase
@@ -543,6 +565,7 @@ function ChildrenSection({
         role: "member",
         status: "active",
         gender: "male",
+        is_married: sonMarried,
         sort_order: maxSort + 1,
       })
       .select("id")
@@ -566,6 +589,7 @@ function ChildrenSection({
     setBusy(false);
     setSonName("");
     setMotherName("");
+    setSonMarried(false);
     setAdding(false);
     router.refresh();
   }
@@ -617,9 +641,35 @@ function ChildrenSection({
               <span className="text-[10px] text-[#94A3B8] font-bold">أضف زوجة أولاً لتظهر هنا كأم</span>
             )}
           </div>
-          <p className="text-[10px] text-[#B45309] font-bold bg-[#FEF3C7] rounded-lg p-2">
-            📱 الابن يُضاف لشجرة العائلة ويظهر بالتطبيق. 🌐 ربط الأم خاص بالموقع فقط.
-          </p>
+
+          {/* الحالة الاجتماعية للابن */}
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => setSonMarried(false)}
+              className={`flex-1 h-8 rounded-lg text-[11px] font-black ${!sonMarried ? "bg-[#64748B] text-white" : "bg-white border border-[#E2E8F0] text-[#64748B]"}`}
+            >
+              🙍‍♂️ غير متزوج
+            </button>
+            <button
+              type="button"
+              onClick={() => setSonMarried(true)}
+              className={`flex-1 h-8 rounded-lg text-[11px] font-black ${sonMarried ? "bg-[#10B981] text-white" : "bg-white border border-[#E2E8F0] text-[#64748B]"}`}
+            >
+              💍 متزوج
+            </button>
+          </div>
+
+          {/* ربط بالتطبيق أو خاص بالموقع */}
+          <label
+            className={`flex items-center gap-2 cursor-pointer text-[10px] font-black p-2 rounded-lg border ${
+              linkToApp ? "bg-[#EFF6FF] border-[#BFDBFE] text-[#1D4ED8]" : "bg-[#FDF2F8] border-[#FBCFE8] text-[#9D174D]"
+            }`}
+          >
+            <input type="checkbox" checked={linkToApp} onChange={(e) => setLinkToApp(e.target.checked)} className="w-3.5 h-3.5 accent-[#1D4ED8]" />
+            {linkToApp ? "📱 ربط بالتطبيق — يظهر بشجرة العائلة" : "🌐 خاص بالموقع فقط — لا يظهر بالتطبيق"}
+          </label>
+
           <button
             type="button"
             onClick={addSon}

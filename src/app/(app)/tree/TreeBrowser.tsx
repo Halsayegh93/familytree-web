@@ -17,6 +17,7 @@ type Member = {
   status: string;
   avatar_url: string | null;
   is_deceased: boolean | null;
+  is_married?: boolean | null;
   birth_date: string | null;
   death_date: string | null;
   phone_number: string | null;
@@ -195,6 +196,19 @@ export function TreeBrowser({
     return m;
   }, [webRelatives]);
 
+  // أبناء ذكور خاصون بالموقع (kind='son' بدون child_profile_id) مفهرسون حسب الأب
+  const webSonsByMan = useMemo(() => {
+    const m = new Map<string, WebRelative[]>();
+    webRelatives.forEach((r) => {
+      if (r.kind === "son" && !r.child_profile_id && r.man_id && r.name) {
+        const arr = m.get(r.man_id) ?? [];
+        arr.push(r);
+        m.set(r.man_id, arr);
+      }
+    });
+    return m;
+  }, [webRelatives]);
+
   // أبناء الإناث المتزوجات (خاص بالموقع) — مفهرسة حسب الأم (web daughter أو women_members)
   const childrenByFemaleWeb = useMemo(() => {
     const m = new Map<string, WebRelative[]>();
@@ -291,6 +305,11 @@ export function TreeBrowser({
     if (!focused) return [];
     return webDaughtersByMan.get(focused.id) ?? [];
   }, [focused, webDaughtersByMan]);
+
+  const webSons = useMemo<WebRelative[]>(() => {
+    if (!focused) return [];
+    return webSonsByMan.get(focused.id) ?? [];
+  }, [focused, webSonsByMan]);
 
   // كل الزوجات (women_members + الويب) كخيارات لاختيار الأم
   const wifeOptions = useMemo<WifeOption[]>(() => {
@@ -528,6 +547,7 @@ export function TreeBrowser({
               focused={focused}
               mother={mother}
               sons={directChildren}
+              webSons={webSons}
               daughters={daughters}
               webDaughters={webDaughters}
               wifeOptions={wifeOptions}
@@ -608,6 +628,7 @@ function RelationsPanel({
   focused,
   mother,
   sons,
+  webSons,
   daughters,
   webDaughters,
   wifeOptions,
@@ -623,6 +644,7 @@ function RelationsPanel({
   focused: Member;
   mother: WomanMember | null;
   sons: Member[];
+  webSons: WebRelative[];
   daughters: WomanMember[];
   webDaughters: WebRelative[];
   wifeOptions: WifeOption[];
@@ -659,8 +681,8 @@ function RelationsPanel({
       {/* الأبناء والبنات — عمودين جنب بعض */}
       <div className="grid grid-cols-2 gap-2 items-start">
         {/* الأبناء */}
-        <Section title="الأبناء" count={sons.length} icon="👨‍👦" color="#5438DC" compact>
-          {sons.length > 0 ? (
+        <Section title="الأبناء" count={sons.length + webSons.length} icon="👨‍👦" color="#5438DC" compact>
+          {sons.length > 0 || webSons.length > 0 ? (
             <div className="grid grid-cols-2 gap-1">
               {sons.map((c) => (
                 <NodeCard
@@ -670,6 +692,9 @@ function RelationsPanel({
                   childrenCount={childrenCountOf(c.id)}
                   compact
                 />
+              ))}
+              {webSons.map((s) => (
+                <WebSonCard key={s.id} son={s} canEdit={canEditMembers} />
               ))}
             </div>
           ) : (
@@ -1164,11 +1189,14 @@ function DaughterModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [husbandDeceasedOnly, setHusbandDeceasedOnly] = useState(false);
   const husbandMatches = useMemo(() => {
     if (!husbandSearch.trim()) return [];
     const q = husbandSearch.toLowerCase();
-    return allMembers.filter((m) => m.full_name.toLowerCase().includes(q)).slice(0, 8);
-  }, [husbandSearch, allMembers]);
+    return allMembers
+      .filter((m) => m.full_name.toLowerCase().includes(q) && (!husbandDeceasedOnly || m.is_deceased))
+      .slice(0, 12);
+  }, [husbandSearch, allMembers, husbandDeceasedOnly]);
   const husbandChosen = husbandProfileId
     ? allMembers.find((m) => m.id === husbandProfileId) ?? null
     : null;
@@ -1390,6 +1418,10 @@ function DaughterModal({
                       placeholder="ابحث عن الزوج من العائلة..."
                       className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#357DED] text-sm"
                     />
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none mt-1 text-[10px] font-black text-[#6B7B8D]">
+                      <input type="checkbox" checked={husbandDeceasedOnly} onChange={(e) => setHusbandDeceasedOnly(e.target.checked)} className="w-3.5 h-3.5 accent-[#6B7B8D]" />
+                      🕊️ عرض المتوفّين فقط
+                    </label>
                     {husbandMatches.length > 0 && (
                       <div className="absolute top-full mt-1 right-0 left-0 bg-white rounded-xl border border-[#E2E8F0] z-20 max-h-48 overflow-y-auto shadow-xl">
                         {husbandMatches.map((m) => (
@@ -1625,11 +1657,14 @@ function ExternalHusbandButton({
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [linkToApp, setLinkToApp] = useState(false);
 
+  const [familyDeceasedOnly, setFamilyDeceasedOnly] = useState(false);
   const familyMatches = useMemo(() => {
     if (!familySearch.trim()) return [];
     const q = familySearch.toLowerCase();
-    return allMembers.filter((m) => m.full_name.toLowerCase().includes(q)).slice(0, 8);
-  }, [familySearch, allMembers]);
+    return allMembers
+      .filter((m) => m.full_name.toLowerCase().includes(q) && (!familyDeceasedOnly || m.is_deceased))
+      .slice(0, 12);
+  }, [familySearch, allMembers, familyDeceasedOnly]);
   const chosenFamily = husbandProfileId
     ? allMembers.find((m) => m.id === husbandProfileId) ?? null
     : null;
@@ -1816,10 +1851,14 @@ function ExternalHusbandButton({
                       <input
                         value={familySearch}
                         onChange={(e) => setFamilySearch(e.target.value)}
-                        placeholder="ابحث عن الزوج بالاسم (يشمل المتوفّين)..."
+                        placeholder="ابحث عن الزوج بالاسم..."
                         className="ext-input"
                         autoFocus
                       />
+                      <label className="flex items-center gap-1.5 cursor-pointer select-none mt-1 text-[10px] font-black text-[#6B7B8D]">
+                        <input type="checkbox" checked={familyDeceasedOnly} onChange={(e) => setFamilyDeceasedOnly(e.target.checked)} className="w-3.5 h-3.5 accent-[#6B7B8D]" />
+                        🕊️ عرض المتوفّين فقط
+                      </label>
                       {familyMatches.length > 0 && (
                         <div className="absolute top-full mt-1 right-0 left-0 bg-white rounded-xl border border-[#E2E8F0] z-20 max-h-48 overflow-y-auto shadow-xl">
                           {familyMatches.map((m) => (
@@ -2003,6 +2042,54 @@ function SourceBadge({ kind }: { kind: "app" | "web" }) {
     >
       🌐 من الموقع
     </span>
+  );
+}
+
+// مربّع ابن خاص بالموقع (🌐)
+function WebSonCard({ son, canEdit }: { son: WebRelative; canEdit: boolean }) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+
+  async function remove() {
+    if (!confirm(`حذف «${son.name}»؟`)) return;
+    setBusy(true);
+    await supabase.from("web_relatives").delete().eq("id", son.id);
+    setBusy(false);
+    router.refresh();
+  }
+
+  return (
+    <div className="relative bg-white rounded-lg border border-[#E2E8F0] p-1 overflow-hidden">
+      <span className="absolute top-0.5 right-0.5 text-[9px]" title="خاص بالموقع">🌐</span>
+      {canEdit && (
+        <button
+          onClick={remove}
+          disabled={busy}
+          className="absolute top-0.5 left-0.5 text-[9px] text-[#EF4444] font-black disabled:opacity-50"
+          title="حذف"
+        >
+          ✕
+        </button>
+      )}
+      <div className="flex flex-col items-center text-center gap-1">
+        <div
+          className={`w-16 h-16 rounded-xl flex items-center justify-center text-white font-black text-xl ${son.is_deceased ? "grayscale opacity-70" : ""}`}
+          style={{ background: "linear-gradient(135deg, #357DED, #5438DCcc)" }}
+        >
+          {(son.name ?? "؟").charAt(0)}
+        </div>
+        <div className="w-full min-w-0">
+          <div className={`font-black truncate text-sm ${son.is_deceased ? "text-[#94A3B8]" : "text-[#0F172A]"}`}>
+            {son.name}
+          </div>
+          <div className="flex items-center justify-center gap-0.5 flex-wrap">
+            {son.is_deceased && <span className="text-[9px]">🕊️</span>}
+            {son.is_married && <span className="text-[9px]" title="متزوج">💍</span>}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -2271,16 +2358,20 @@ function FocusedMemberCard({
             )}
           </div>
 
-          {/* الزوجات — بجانب اسم العضو */}
-          {(wives.length > 0 || canEditMembers) && (
-            <WivesInline
-              husbandId={member.id}
-              wives={wives}
-              webWives={webWives}
-              canEdit={canEditMembers}
-              motherNamesInUse={motherNamesInUse}
-              familyWomen={familyWomen}
-            />
+          {/* الزوجات — بجانب اسم العضو (تظهر فقط إذا متزوج) */}
+          {member.is_married === false ? (
+            <div className="mt-2 text-[10px] font-black text-[#64748B]">🙍‍♂️ غير متزوج</div>
+          ) : (
+            (wives.length > 0 || canEditMembers) && (
+              <WivesInline
+                husbandId={member.id}
+                wives={wives}
+                webWives={webWives}
+                canEdit={canEditMembers}
+                motherNamesInUse={motherNamesInUse}
+                familyWomen={familyWomen}
+              />
+            )
           )}
 
           {/* أم العضو — اختيار من زوجات أبيه */}

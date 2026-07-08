@@ -24,7 +24,7 @@ export default async function TreePage() {
   const { data: members } = await applyCountableFilters(
     supabase
       .from("profiles")
-      .select("id, first_name, full_name, father_id, mother_id, role, status, avatar_url, is_deceased, is_hidden_from_tree, sort_order, birth_date, death_date, phone_number")
+      .select("id, first_name, full_name, father_id, mother_id, role, status, avatar_url, is_deceased, is_married, is_hidden_from_tree, sort_order, birth_date, death_date, phone_number")
       .order("sort_order", { ascending: true })
   ).limit(10000);
 
