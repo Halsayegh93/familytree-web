@@ -62,6 +62,7 @@ type WebRelative = {
   parent_rel_id: string | null;
   parent_woman_id: string | null;
   is_deceased: boolean | null;
+  is_married: boolean | null;
   husband_type: "family" | "external" | null;
   husband_profile_id: string | null;
   husband_name: string | null;
@@ -736,7 +737,7 @@ function RelationsPanel({
                     avatarUrl={null}
                     isDeceased={d.is_deceased}
                     source="web"
-                    hasHusband={!!d.husband_type}
+                    hasHusband={d.is_married ?? !!d.husband_type}
                     childCount={childrenByFemaleWeb.get(d.id)?.length ?? 0}
                     selected={selDaughter?.source === "web" && selDaughter.id === d.id}
                     onClick={() =>
@@ -819,6 +820,7 @@ function WebDaughterRow({
   childrenOfHer: WebRelative[];
 }) {
   const [editing, setEditing] = useState(false);
+  const isMarried = daughter.is_married ?? !!daughter.husband_type;
   const husbandName =
     daughter.husband_type === "family"
       ? allMembers.find((m) => m.id === daughter.husband_profile_id)?.full_name ?? "—"
@@ -843,7 +845,9 @@ function WebDaughterRow({
           {daughter.mother_name && (
             <div className="text-[11px] text-[#DB2777] font-bold mt-0.5">👩 الأم: {daughter.mother_name}</div>
           )}
-          {husbandName ? (
+          {!isMarried ? (
+            <div className="text-[11px] text-[#64748B] font-bold mt-0.5">🙍‍♀️ غير متزوجة</div>
+          ) : husbandName ? (
             <div
               className={`text-[11px] font-bold mt-0.5 ${
                 daughter.husband_type === "family" ? "text-[#357DED]" : "text-[#9D174D]"
@@ -855,7 +859,7 @@ function WebDaughterRow({
               {daughter.husband_deceased ? " 🕊️" : ""}
             </div>
           ) : (
-            <div className="text-[11px] text-[#94A3B8] font-semibold mt-0.5">لا يوجد زوج مسجّل</div>
+            <div className="text-[11px] text-[#94A3B8] font-semibold mt-0.5">💍 متزوجة — لا يوجد زوج مسجّل</div>
           )}
         </div>
         {canEdit && (
@@ -870,15 +874,18 @@ function WebDaughterRow({
       {daughter.notes && (
         <div className="text-[11px] text-[#64748B] mt-1.5 pr-14 whitespace-pre-wrap">📝 {daughter.notes}</div>
       )}
-      {/* أبناؤها — خاص بالموقع، مرتبطون بزوجها */}
-      <FemaleChildren
-        parentRelId={daughter.id}
-        parentWomanId={null}
-        parentName={daughter.name ?? ""}
-        childrenOfHer={childrenOfHer}
-        canEdit={canEdit}
-        husbandLabel={husbandName}
-      />
+      {/* أبناؤها — فقط إذا متزوجة، مرتبطون بزوجها */}
+      {isMarried && (
+        <FemaleChildren
+          parentRelId={daughter.id}
+          parentWomanId={null}
+          parentName={daughter.name ?? ""}
+          childrenOfHer={childrenOfHer}
+          canEdit={canEdit}
+          husbandLabel={husbandName}
+          husbandProfileId={daughter.husband_type === "family" ? daughter.husband_profile_id : null}
+        />
+      )}
       {editing && (
         <DaughterModal
           manId={manId}
@@ -900,6 +907,7 @@ function FemaleChildren({
   childrenOfHer,
   canEdit,
   husbandLabel,
+  husbandProfileId,
 }: {
   parentRelId: string | null;
   parentWomanId: string | null;
@@ -907,6 +915,7 @@ function FemaleChildren({
   childrenOfHer: WebRelative[];
   canEdit: boolean;
   husbandLabel: string | null;
+  husbandProfileId: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -914,17 +923,21 @@ function FemaleChildren({
   const [name, setName] = useState("");
   const [gender, setGender] = useState<"son" | "daughter">("son");
   const [deceased, setDeceased] = useState(false);
+  const [linkToApp, setLinkToApp] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const hasHusband = !!husbandLabel;
+  // الربط بالتطبيق ممكن فقط لو الزوج من العائلة (له سجل profiles)
+  const canLinkToApp = !!husbandProfileId;
   if (childrenOfHer.length === 0 && !canEdit) return null;
 
   function resetForm() {
     setName("");
     setGender("son");
     setDeceased(false);
+    setLinkToApp(false);
     setEditId(null);
     setErr(null);
   }
@@ -933,6 +946,33 @@ function FemaleChildren({
     if (!name.trim()) return;
     setBusy(true);
     setErr(null);
+
+    if (linkToApp && husbandProfileId && !editId) {
+      // 📱 ربط بالتطبيق — الطفل يصير عضواً حقيقياً تحت أبيه (زوج الأنثى من العائلة)
+      if (
+        !confirm(
+          `🔗 ربط «${name.trim()}» بالتطبيق تحت أبيه «${husbandLabel}»؟ راح يظهر بشجرة العائلة بالآيفون/الأندرويد.`
+        )
+      ) {
+        setBusy(false);
+        return;
+      }
+      const { error } = await supabase.from("profiles").insert({
+        first_name: name.trim(),
+        full_name: `${name.trim()} ${husbandLabel}`.trim(),
+        father_id: husbandProfileId,
+        role: "member",
+        status: "active",
+        gender: gender === "daughter" ? "female" : "male",
+        is_deceased: deceased,
+      });
+      setBusy(false);
+      if (error) return setErr("خطأ: " + error.message);
+      resetForm();
+      router.refresh();
+      return;
+    }
+
     const payload = {
       kind: gender,
       name: name.trim(),
@@ -1047,6 +1087,21 @@ function FemaleChildren({
                 <input type="checkbox" checked={deceased} onChange={(e) => setDeceased(e.target.checked)} className="w-3.5 h-3.5 accent-[#0EA5E9]" />
                 🕊️ متوفى
               </label>
+              {/* ربط بالتطبيق — فقط لو الزوج من العائلة وعند الإضافة */}
+              {canLinkToApp && !editId ? (
+                <label
+                  className={`flex items-center gap-2 cursor-pointer text-[10px] font-black p-1.5 rounded-lg border ${
+                    linkToApp ? "bg-[#EFF6FF] border-[#BFDBFE] text-[#1D4ED8]" : "bg-[#FDF2F8] border-[#FBCFE8] text-[#9D174D]"
+                  }`}
+                >
+                  <input type="checkbox" checked={linkToApp} onChange={(e) => setLinkToApp(e.target.checked)} className="w-3.5 h-3.5 accent-[#1D4ED8]" />
+                  {linkToApp ? "📱 ربط بالتطبيق (تحت أبيه بالشجرة)" : "🌐 خاص بالموقع فقط"}
+                </label>
+              ) : (
+                <p className="text-[9px] text-[#94A3B8] font-bold">
+                  {editId ? "🌐 خاص بالموقع" : "🌐 خاص بالموقع — الربط بالتطبيق يحتاج زوجاً من العائلة"}
+                </p>
+              )}
               <div className="flex gap-1.5">
                 {editId && (
                   <button type="button" onClick={resetForm} className="h-8 px-3 rounded-lg bg-white text-[#64748B] text-[11px] font-black">
@@ -1062,7 +1117,6 @@ function FemaleChildren({
                   {busy ? "..." : editId ? "حفظ" : "إضافة"}
                 </button>
               </div>
-              <p className="text-[9px] text-[#94A3B8] font-bold">🌐 خاص بالموقع — لا يظهر بالتطبيق</p>
               {err && <p className="text-[10px] text-red-600 font-bold">{err}</p>}
             </div>
           )}
@@ -1103,6 +1157,9 @@ function DaughterModal({
   const [husbandNationality, setHusbandNationality] = useState(daughter?.husband_nationality ?? "");
   const [husbandDeceased, setHusbandDeceased] = useState(daughter?.husband_deceased ?? false);
   const [notes, setNotes] = useState(daughter?.notes ?? "");
+  const [isMarried, setIsMarried] = useState(
+    daughter ? daughter.is_married ?? !!daughter.husband_type : false
+  );
   const [linkToApp, setLinkToApp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1155,18 +1212,20 @@ function DaughterModal({
       return;
     }
 
+    const married = isMarried;
     const payload: Record<string, any> = {
       man_id: manId,
       kind: "daughter",
       name: name.trim(),
       is_deceased: isDeceased,
+      is_married: married,
       mother_name: motherName.trim() || null,
-      husband_type: husbandType || null,
-      husband_profile_id: husbandType === "family" ? husbandProfileId : null,
-      husband_name: husbandType === "external" ? husbandName.trim() || null : null,
-      husband_family: husbandType === "external" ? husbandFamily.trim() || null : null,
-      husband_nationality: husbandType === "external" ? husbandNationality.trim() || null : null,
-      husband_deceased: husbandType === "external" ? husbandDeceased : false,
+      husband_type: married ? husbandType || null : null,
+      husband_profile_id: married && husbandType === "family" ? husbandProfileId : null,
+      husband_name: married && husbandType === "external" ? husbandName.trim() || null : null,
+      husband_family: married && husbandType === "external" ? husbandFamily.trim() || null : null,
+      husband_nationality: married && husbandType === "external" ? husbandNationality.trim() || null : null,
+      husband_deceased: married && husbandType === "external" ? husbandDeceased : false,
       notes: notes.trim() || null,
     };
 
@@ -1260,8 +1319,32 @@ function DaughterModal({
             <span className="text-sm font-bold text-[#0F172A]">🕊️ متوفاة</span>
           </label>
 
-          {/* الزوج — خاص بالموقع فقط */}
+          {/* الحالة الاجتماعية */}
           {!linkToApp && (
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => setIsMarried(false)}
+                className={`flex-1 h-9 rounded-lg text-xs font-black transition ${
+                  !isMarried ? "bg-[#64748B] text-white" : "bg-[#F1F5F9] text-[#64748B]"
+                }`}
+              >
+                🙍‍♀️ غير متزوجة
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsMarried(true)}
+                className={`flex-1 h-9 rounded-lg text-xs font-black transition ${
+                  isMarried ? "bg-[#EC4899] text-white" : "bg-[#F1F5F9] text-[#64748B]"
+                }`}
+              >
+                💍 متزوجة
+              </button>
+            </div>
+          )}
+
+          {/* الزوج — خاص بالموقع فقط، فقط إذا متزوجة */}
+          {!linkToApp && isMarried && (
           <div className="border-t border-[#F1F5F9] pt-3">
             <span className="text-[11px] font-black text-[#64748B] mb-1.5 block">الزوج</span>
             <div className="flex gap-1.5 mb-2">
@@ -1493,15 +1576,18 @@ function DaughterRow({
           📝 {ext.notes}
         </div>
       )}
-      {/* أبناؤها — خاص بالموقع، مرتبطون بزوجها */}
-      <FemaleChildren
-        parentRelId={null}
-        parentWomanId={daughter.id}
-        parentName={daughter.full_name}
-        childrenOfHer={childrenOfHer}
-        canEdit={canEdit}
-        husbandLabel={husbandLabel}
-      />
+      {/* أبناؤها — فقط إذا متزوجة (لها زوج)، مرتبطون بزوجها */}
+      {husbandLabel && (
+        <FemaleChildren
+          parentRelId={null}
+          parentWomanId={daughter.id}
+          parentName={daughter.full_name}
+          childrenOfHer={childrenOfHer}
+          canEdit={canEdit}
+          husbandLabel={husbandLabel}
+          husbandProfileId={internalHusbandName ? daughter.husband_id : ext?.husband_profile_id ?? null}
+        />
+      )}
       {editing && (
         <WomanMemberEditModal woman={daughter} role="daughter" onClose={() => setEditing(false)} />
       )}
@@ -1537,6 +1623,7 @@ function ExternalHusbandButton({
   const [nationality, setNationality] = useState(existing?.nationality ?? "");
   const [isDeceased, setIsDeceased] = useState(existing?.is_deceased ?? false);
   const [notes, setNotes] = useState(existing?.notes ?? "");
+  const [linkToApp, setLinkToApp] = useState(false);
 
   const familyMatches = useMemo(() => {
     if (!familySearch.trim()) return [];
@@ -1563,6 +1650,33 @@ function ExternalHusbandButton({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+
+    // 📱 ربط بالتطبيق — زوج من العائلة يُسجَّل على سجل المرأة بالتطبيق (women_members.husband_id)
+    if (linkToApp && source === "family" && husbandProfileId) {
+      if (
+        !confirm(
+          "🔗 ربط الزوج بالتطبيق؟ راح تظهر المرأة متزوجة به بشجرة النساء بالآيفون/الأندرويد."
+        )
+      )
+        return;
+      setBusy(true);
+      setError(null);
+      const { error: upErr } = await supabase
+        .from("women_members")
+        .update({ husband_id: husbandProfileId })
+        .eq("id", womanId);
+      if (upErr) {
+        setBusy(false);
+        setError("خطأ: " + upErr.message);
+        return;
+      }
+      if (existing) await supabase.from("external_spouses").delete().eq("id", existing.id);
+      setBusy(false);
+      setOpen(false);
+      router.refresh();
+      return;
+    }
+
     let payload: Record<string, any>;
     if (source === "family") {
       if (!husbandProfileId || !chosenFamilyName) {
@@ -1746,7 +1860,11 @@ function ExternalHusbandButton({
                 <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="أي معلومات إضافية..." className="ext-input resize-none" />
               </Field>
 
-              <p className="text-[10px] text-[#94A3B8] font-bold">🌐 خاص بالموقع — لا يظهر بتطبيق الآيفون/الأندرويد</p>
+              {source === "family" && husbandProfileId ? (
+                <AppLinkToggle value={linkToApp} onChange={setLinkToApp} />
+              ) : (
+                <p className="text-[10px] text-[#94A3B8] font-bold">🌐 خاص بالموقع — الربط بالتطبيق يحتاج زوجاً من العائلة</p>
+              )}
               {error && (
                 <div className="bg-red-50 text-red-700 text-xs font-bold rounded-xl p-2.5">{error}</div>
               )}

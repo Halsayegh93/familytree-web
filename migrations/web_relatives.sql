@@ -76,3 +76,6 @@ alter table public.web_relatives
   add column if not exists parent_woman_id uuid references public.women_members(id) on delete cascade;
 create index if not exists idx_web_relatives_parent_rel on public.web_relatives(parent_rel_id);
 create index if not exists idx_web_relatives_parent_woman on public.web_relatives(parent_woman_id);
+
+-- حالة زواج البنت (طبقة الويب) — لإخفاء الأبناء إن كانت غير متزوجة.
+alter table public.web_relatives add column if not exists is_married boolean;
