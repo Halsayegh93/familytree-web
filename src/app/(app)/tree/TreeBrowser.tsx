@@ -30,6 +30,7 @@ type WomanMember = {
   full_name: string;
   parent_id: string | null;
   mother_id: string | null;
+  mother_name: string | null;
   husband_id: string | null;
   gender: string | null;
   is_deceased: boolean | null;
@@ -788,6 +789,7 @@ function RelationsPanel({
                       canEdit={canEditMembers}
                       childrenOfHer={childrenByFemaleReal.get(d.id) ?? []}
                       allMembers={allMembers}
+                      wifeOptions={wifeOptions}
                     />
                   ) : null;
                 })()}
@@ -1532,6 +1534,7 @@ function DaughterRow({
   canEdit = false,
   childrenOfHer = [],
   allMembers = [],
+  wifeOptions = [],
 }: {
   daughter: WomanMember;
   internalHusbandName: string | null;
@@ -1539,6 +1542,7 @@ function DaughterRow({
   canEdit?: boolean;
   childrenOfHer?: WebRelative[];
   allMembers?: Member[];
+  wifeOptions?: WifeOption[];
 }) {
   const ext = externals[0] ?? null;
   const [editing, setEditing] = useState(false);
@@ -1564,6 +1568,9 @@ function DaughterRow({
             <SourceBadge kind="app" />
             <StatusPill deceased={daughter.is_deceased} />
           </div>
+          {daughter.mother_name && (
+            <div className="text-[11px] text-[#DB2777] font-bold mt-0.5">👩 الأم: {daughter.mother_name}</div>
+          )}
           {/* حالة الزواج */}
           {!married ? (
             <div className="text-[11px] text-[#64748B] font-bold mt-0.5">🙍‍♀️ غير متزوجة</div>
@@ -1626,7 +1633,12 @@ function DaughterRow({
         />
       )}
       {editing && (
-        <WomanMemberEditModal woman={daughter} role="daughter" onClose={() => setEditing(false)} />
+        <WomanMemberEditModal
+          woman={daughter}
+          role="daughter"
+          motherOptions={wifeOptions}
+          onClose={() => setEditing(false)}
+        />
       )}
     </div>
   );
@@ -2247,6 +2259,8 @@ function FocusedMemberCard({
                 onNavigate={onNavigate}
                 wifeOptions={wifeOptions}
                 sonMotherByChild={sonMotherByChild}
+                motherOptions={myMotherOptions}
+                motherLink={myMotherLink}
               />
             </div>
           ) : (
@@ -2831,10 +2845,12 @@ function WomanMemberEditModal({
   woman,
   role,
   onClose,
+  motherOptions = [],
 }: {
   woman: WomanMember;
   role: "wife" | "mother" | "daughter";
   onClose: () => void;
+  motherOptions?: WifeOption[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -2845,6 +2861,7 @@ function WomanMemberEditModal({
   const [deathDate, setDeathDate] = useState(woman.death_date ?? "");
   const [isDeceased, setIsDeceased] = useState(woman.is_deceased ?? false);
   const [isMarried, setIsMarried] = useState(woman.is_married ?? !!woman.husband_id);
+  const [motherName, setMotherName] = useState(woman.mother_name ?? "");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(woman.avatar_url);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -2895,6 +2912,7 @@ function WomanMemberEditModal({
         death_date: isDeceased ? deathDate || null : null,
         is_deceased: isDeceased,
         is_married: isMarried,
+        mother_name: motherName.trim() || null,
         avatar_url: avatarUrl,
       })
       .eq("id", woman.id);
@@ -3023,6 +3041,28 @@ function WomanMemberEditModal({
                 </button>
               </div>
             </div>
+          )}
+          {/* الأم — اختيار من زوجات أبيها */}
+          {role === "daughter" && (
+            <label className="block">
+              <span className="text-[11px] font-black text-[#64748B] mb-1 block">الأم (اختياري)</span>
+              <select
+                value={motherName}
+                onChange={(e) => setMotherName(e.target.value)}
+                className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#DB2777] text-sm font-bold"
+              >
+                <option value="">— اختر الأم —</option>
+                {motherName && !motherOptions.some((o) => o.name === motherName) && (
+                  <option value={motherName}>{motherName}</option>
+                )}
+                {motherOptions.map((o) => (
+                  <option key={o.id} value={o.name}>{o.name}</option>
+                ))}
+              </select>
+              {motherOptions.length === 0 && (
+                <span className="text-[10px] text-[#94A3B8] font-bold">سجّل زوجات لأبيها أولاً</span>
+              )}
+            </label>
           )}
           <p className="text-[10px] text-[#B45309] font-bold bg-[#FEF3C7] rounded-lg p-2">
             📱 سجل من التطبيق (آيفون/أندرويد) — أي تعديل أو حذف هنا يظهر بالتطبيق أيضاً.

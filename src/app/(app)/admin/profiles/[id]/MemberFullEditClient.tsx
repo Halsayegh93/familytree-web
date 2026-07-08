@@ -26,6 +26,8 @@ export function MemberFullEditClient({
   onNavigate,
   wifeOptions,
   sonMotherByChild,
+  motherOptions,
+  motherLink,
 }: {
   member: any;
   canManageRoles: boolean;
@@ -40,6 +42,10 @@ export function MemberFullEditClient({
   wifeOptions?: WifeOpt[];
   /** خريطة ابن → أمه (طبقة ويب) */
   sonMotherByChild?: ReadonlyMap<string, SonMother>;
+  /** زوجات أبي العضو — لاختيار أمّ العضو نفسه */
+  motherOptions?: WifeOpt[];
+  /** ربط أمّ العضو الحالي (طبقة ويب) */
+  motherLink?: SonMother | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -205,6 +211,18 @@ export function MemberFullEditClient({
                 currentId={fatherId}
                 selfId={member.id}
                 onChange={setFatherId}
+              />
+            </Group>
+          )}
+
+          {/* الأم — اختيار من زوجات الأب (طبقة ويب) */}
+          {motherOptions && member.father_id && (
+            <Group title="الأم">
+              <SonMotherSelect
+                childId={member.id}
+                manId={member.father_id}
+                wifeOptions={motherOptions}
+                existing={motherLink ?? null}
               />
             </Group>
           )}
