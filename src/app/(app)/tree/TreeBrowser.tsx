@@ -1115,6 +1115,7 @@ function DaughterModal({
   const [husbandNationality, setHusbandNationality] = useState(daughter?.husband_nationality ?? "");
   const [husbandDeceased, setHusbandDeceased] = useState(daughter?.husband_deceased ?? false);
   const [notes, setNotes] = useState(daughter?.notes ?? "");
+  const [linkToApp, setLinkToApp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1136,6 +1137,35 @@ function DaughterModal({
     }
     setBusy(true);
     setError(null);
+
+    if (linkToApp) {
+      // 📱 ربط بالتطبيق — women_members (بنت حقيقية بشجرة النساء)
+      if (
+        !confirm(
+          "🔗 ربط البنت بالتطبيق؟ راح تظهر بتطبيق الآيفون/الأندرويد. (بيانات الزوج/الأم تبقى خاصة بالموقع وتُضاف بعد الإنشاء.)"
+        )
+      ) {
+        setBusy(false);
+        return;
+      }
+      const { error: insErr } = await supabase.from("women_members").insert({
+        first_name: name.trim(),
+        full_name: name.trim(),
+        parent_id: manId,
+        gender: "female",
+        is_deceased: isDeceased,
+      });
+      if (insErr) {
+        setBusy(false);
+        setError("خطأ: " + insErr.message);
+        return;
+      }
+      if (daughter) await supabase.from("web_relatives").delete().eq("id", daughter.id);
+      setBusy(false);
+      onClose();
+      router.refresh();
+      return;
+    }
 
     const payload: Record<string, any> = {
       man_id: manId,
@@ -1210,23 +1240,27 @@ function DaughterModal({
             />
           </label>
 
-          {/* الأم */}
-          <label className="block">
-            <span className="text-[11px] font-black text-[#64748B] mb-1 block">الأم (اختياري)</span>
-            <select
-              value={motherName}
-              onChange={(e) => setMotherName(e.target.value)}
-              className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#EC4899] text-sm font-bold"
-            >
-              <option value="">— اختر الأم —</option>
-              {wifeOptions.map((w) => (
-                <option key={w.id} value={w.name}>{w.name}</option>
-              ))}
-            </select>
-            {wifeOptions.length === 0 && (
-              <span className="text-[10px] text-[#94A3B8] font-bold">أضف زوجة أولاً لتظهر هنا كأم</span>
-            )}
-          </label>
+          <AppLinkToggle value={linkToApp} onChange={setLinkToApp} />
+
+          {/* الأم — خاص بالموقع فقط */}
+          {!linkToApp && (
+            <label className="block">
+              <span className="text-[11px] font-black text-[#64748B] mb-1 block">الأم (اختياري)</span>
+              <select
+                value={motherName}
+                onChange={(e) => setMotherName(e.target.value)}
+                className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#EC4899] text-sm font-bold"
+              >
+                <option value="">— اختر الأم —</option>
+                {wifeOptions.map((w) => (
+                  <option key={w.id} value={w.name}>{w.name}</option>
+                ))}
+              </select>
+              {wifeOptions.length === 0 && (
+                <span className="text-[10px] text-[#94A3B8] font-bold">أضف زوجة أولاً لتظهر هنا كأم</span>
+              )}
+            </label>
+          )}
 
           <label className="flex items-center gap-2 cursor-pointer select-none py-1">
             <input
@@ -1238,7 +1272,8 @@ function DaughterModal({
             <span className="text-sm font-bold text-[#0F172A]">🕊️ متوفاة</span>
           </label>
 
-          {/* الزوج */}
+          {/* الزوج — خاص بالموقع فقط */}
+          {!linkToApp && (
           <div className="border-t border-[#F1F5F9] pt-3">
             <span className="text-[11px] font-black text-[#64748B] mb-1.5 block">الزوج</span>
             <div className="flex gap-1.5 mb-2">
@@ -1340,19 +1375,21 @@ function DaughterModal({
               </div>
             )}
           </div>
+          )}
 
-          <label className="block">
-            <span className="text-[11px] font-black text-[#64748B] mb-1 block">ملاحظات</span>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              placeholder="أي معلومات إضافية..."
-              className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#EC4899] text-sm resize-none"
-            />
-          </label>
+          {!linkToApp && (
+            <label className="block">
+              <span className="text-[11px] font-black text-[#64748B] mb-1 block">ملاحظات</span>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+                placeholder="أي معلومات إضافية..."
+                className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#EC4899] text-sm resize-none"
+              />
+            </label>
+          )}
 
-          <p className="text-[10px] text-[#94A3B8] font-bold">🔒 خاص بالموقع — لا يظهر بتطبيق الآيفون/الأندرويد</p>
           {error && (
             <div className="bg-red-50 text-red-700 text-xs font-bold rounded-xl p-2.5">{error}</div>
           )}
@@ -1851,6 +1888,29 @@ function Avatar({
   );
 }
 
+// مفتاح: ربط بالتطبيق (📱 women_members) أو خاص بالموقع (🌐 web_relatives)
+function AppLinkToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label
+      className={`flex items-center gap-2 cursor-pointer select-none p-2.5 rounded-xl border transition ${
+        value ? "bg-[#EFF6FF] border-[#BFDBFE]" : "bg-[#FDF2F8] border-[#FBCFE8]"
+      }`}
+    >
+      <input
+        type="checkbox"
+        checked={value}
+        onChange={(e) => onChange(e.target.checked)}
+        className="w-4 h-4 accent-[#1D4ED8]"
+      />
+      <span className={`flex-1 text-[11px] font-black ${value ? "text-[#1D4ED8]" : "text-[#9D174D]"}`}>
+        {value
+          ? "📱 ربط بالتطبيق — راح يظهر بالآيفون/الأندرويد"
+          : "🌐 خاص بالموقع فقط — لا يظهر بالتطبيق"}
+      </span>
+    </label>
+  );
+}
+
 // شارة الحالة: نشطة / متوفاة
 function StatusPill({ deceased }: { deceased: boolean | null }) {
   return deceased ? (
@@ -2304,6 +2364,7 @@ function WifeModal({
   const [linkedWomanId, setLinkedWomanId] = useState<string | null>(wife?.linked_woman_id ?? null);
   const [familySearch, setFamilySearch] = useState("");
   const [isDeceased, setIsDeceased] = useState(wife?.is_deceased ?? false);
+  const [linkToApp, setLinkToApp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -2325,22 +2386,55 @@ function WifeModal({
     setBusy(true);
     setError(null);
 
-    const payload = {
-      man_id: husbandId,
-      kind: "wife",
-      name: name.trim(),
-      linked_woman_id: source === "family" ? linkedWomanId : null,
-      is_deceased: isDeceased,
-    };
-
-    const { error: err } = wife
-      ? await supabase.from("web_relatives").update(payload).eq("id", wife.id)
-      : await supabase.from("web_relatives").insert(payload);
-
-    if (err) {
-      setBusy(false);
-      setError("خطأ: " + err.message);
-      return;
+    if (linkToApp) {
+      // 📱 ربط بالتطبيق — women_members (يظهر بشجرة النساء بالتطبيق)
+      if (
+        !confirm(
+          "🔗 ربط الزوجة بالتطبيق؟ راح تظهر بتطبيق الآيفون/الأندرويد (شجرة النساء)."
+        )
+      ) {
+        setBusy(false);
+        return;
+      }
+      let err;
+      if (source === "family" && linkedWomanId) {
+        ({ error: err } = await supabase
+          .from("women_members")
+          .update({ husband_id: husbandId })
+          .eq("id", linkedWomanId));
+      } else {
+        ({ error: err } = await supabase.from("women_members").insert({
+          first_name: name.trim(),
+          full_name: name.trim(),
+          husband_id: husbandId,
+          gender: "female",
+          is_deceased: isDeceased,
+        }));
+      }
+      if (err) {
+        setBusy(false);
+        setError("خطأ: " + err.message);
+        return;
+      }
+      // لو كانت مسجّلة بالويب ونُقلت للتطبيق → احذف صف الويب
+      if (wife) await supabase.from("web_relatives").delete().eq("id", wife.id);
+    } else {
+      // 🌐 خاص بالموقع — web_relatives
+      const payload = {
+        man_id: husbandId,
+        kind: "wife",
+        name: name.trim(),
+        linked_woman_id: source === "family" ? linkedWomanId : null,
+        is_deceased: isDeceased,
+      };
+      const { error: err } = wife
+        ? await supabase.from("web_relatives").update(payload).eq("id", wife.id)
+        : await supabase.from("web_relatives").insert(payload);
+      if (err) {
+        setBusy(false);
+        setError("خطأ: " + err.message);
+        return;
+      }
     }
     setBusy(false);
     onClose();
@@ -2482,7 +2576,7 @@ function WifeModal({
               <span>هذه الزوجة مرتبطة كأم لأبناء/بنات. عند الحذف يبقى اسمها مسجّلاً عند الأبناء.</span>
             </div>
           )}
-          <p className="text-[10px] text-[#94A3B8] font-bold">🔒 خاص بالموقع — لا يظهر بتطبيق الآيفون/الأندرويد</p>
+          <AppLinkToggle value={linkToApp} onChange={setLinkToApp} />
           {error && (
             <div className="bg-red-50 text-red-700 text-xs font-bold rounded-xl p-2.5">{error}</div>
           )}
