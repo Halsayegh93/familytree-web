@@ -953,13 +953,14 @@ function FemaleChildren({
   const [gender, setGender] = useState<"son" | "daughter">("son");
   const [deceased, setDeceased] = useState(false);
   const [linkToApp, setLinkToApp] = useState(false);
+  const [childPhone, setChildPhone] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const hasHusband = !!husbandLabel;
-  // الربط بالتطبيق ممكن فقط لو الزوج من العائلة (له سجل profiles)
-  const canLinkToApp = !!husbandProfileId;
+  // الربط بالتطبيق ممكن لأي أنثى متزوجة (الابن يصير عضواً حقيقياً — تحت أبيه إن كان من العائلة، أو بدون أب)
+  const canLinkToApp = hasHusband;
   if (childrenOfHer.length === 0 && !canEdit) return null;
 
   function resetForm() {
@@ -967,6 +968,7 @@ function FemaleChildren({
     setGender("son");
     setDeceased(false);
     setLinkToApp(false);
+    setChildPhone("");
     setEditId(null);
     setErr(null);
   }
@@ -976,24 +978,22 @@ function FemaleChildren({
     setBusy(true);
     setErr(null);
 
-    if (linkToApp && husbandProfileId && !editId) {
-      // 📱 ربط بالتطبيق — الطفل يصير عضواً حقيقياً تحت أبيه (زوج الأنثى من العائلة)
-      if (
-        !confirm(
-          `🔗 ربط «${name.trim()}» بالتطبيق تحت أبيه «${husbandLabel}»؟ راح يظهر بشجرة العائلة بالآيفون/الأندرويد.`
-        )
-      ) {
+    if (linkToApp && !editId) {
+      // 📱 ربط بالتطبيق — الطفل يصير عضواً حقيقياً (تحت أبيه إن كان من العائلة، وإلا بدون أب)
+      const underFather = husbandProfileId ? `تحت أبيه «${husbandLabel}»` : "كعضو حقيقي (أبوه خارج العائلة — بدون أب بالشجرة)";
+      if (!confirm(`🔗 ربط «${name.trim()}» بالتطبيق ${underFather}؟ راح يظهر بالآيفون/الأندرويد.`)) {
         setBusy(false);
         return;
       }
       const { error } = await supabase.from("profiles").insert({
         first_name: name.trim(),
-        full_name: `${name.trim()} ${husbandLabel}`.trim(),
-        father_id: husbandProfileId,
+        full_name: `${name.trim()} ${husbandLabel ?? ""}`.trim(),
+        father_id: husbandProfileId ?? null,
         role: "member",
         status: "active",
         gender: gender === "daughter" ? "female" : "male",
         is_deceased: deceased,
+        phone_number: childPhone.trim() || null,
       });
       setBusy(false);
       if (error) return setErr("خطأ: " + error.message);
@@ -1116,20 +1116,38 @@ function FemaleChildren({
                 <input type="checkbox" checked={deceased} onChange={(e) => setDeceased(e.target.checked)} className="w-3.5 h-3.5 accent-[#0EA5E9]" />
                 🕊️ متوفى
               </label>
-              {/* ربط بالتطبيق — فقط لو الزوج من العائلة وعند الإضافة */}
+              {/* ربط بالتطبيق — عند الإضافة (عضو حقيقي يقدر يدخل بالهاتف) */}
               {canLinkToApp && !editId ? (
-                <label
-                  className={`flex items-center gap-2 cursor-pointer text-[10px] font-black p-1.5 rounded-lg border ${
-                    linkToApp ? "bg-[#EFF6FF] border-[#BFDBFE] text-[#1D4ED8]" : "bg-[#FDF2F8] border-[#FBCFE8] text-[#9D174D]"
-                  }`}
-                >
-                  <input type="checkbox" checked={linkToApp} onChange={(e) => setLinkToApp(e.target.checked)} className="w-3.5 h-3.5 accent-[#1D4ED8]" />
-                  {linkToApp ? "📱 ربط بالتطبيق (تحت أبيه بالشجرة)" : "🌐 خاص بالموقع فقط"}
-                </label>
+                <>
+                  <label
+                    className={`flex items-center gap-2 cursor-pointer text-[10px] font-black p-1.5 rounded-lg border ${
+                      linkToApp ? "bg-[#EFF6FF] border-[#BFDBFE] text-[#1D4ED8]" : "bg-[#FDF2F8] border-[#FBCFE8] text-[#9D174D]"
+                    }`}
+                  >
+                    <input type="checkbox" checked={linkToApp} onChange={(e) => setLinkToApp(e.target.checked)} className="w-3.5 h-3.5 accent-[#1D4ED8]" />
+                    {linkToApp
+                      ? husbandProfileId
+                        ? "📱 عضو حقيقي (تحت أبيه بالشجرة)"
+                        : "📱 عضو حقيقي (أبوه خارجي — بدون أب بالشجرة)"
+                      : "🌐 خاص بالموقع فقط"}
+                  </label>
+                  {linkToApp && (
+                    <div>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        value={childPhone}
+                        onChange={(e) => setChildPhone(e.target.value)}
+                        placeholder="📞 +965... (هاتف الدخول — اختياري)"
+                        dir="ltr"
+                        className="w-full px-2.5 py-2 bg-white rounded-lg outline-none focus:ring-2 focus:ring-[#0EA5E9] text-xs"
+                      />
+                      <span className="text-[9px] text-[#94A3B8] font-bold">يمكّنه من الدخول للتطبيق والموقع برقمه</span>
+                    </div>
+                  )}
+                </>
               ) : (
-                <p className="text-[9px] text-[#94A3B8] font-bold">
-                  {editId ? "🌐 خاص بالموقع" : "🌐 خاص بالموقع — الربط بالتطبيق يحتاج زوجاً من العائلة"}
-                </p>
+                <p className="text-[9px] text-[#94A3B8] font-bold">🌐 خاص بالموقع</p>
               )}
               <div className="flex gap-1.5">
                 {editId && (

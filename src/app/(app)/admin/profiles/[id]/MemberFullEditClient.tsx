@@ -542,6 +542,7 @@ function ChildrenSection({
   const [sonName, setSonName] = useState("");
   const [motherName, setMotherName] = useState("");
   const [sonMarried, setSonMarried] = useState(false);
+  const [sonPhone, setSonPhone] = useState("");
   const [linkToApp, setLinkToApp] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -584,6 +585,7 @@ function ChildrenSection({
         status: "active",
         gender: "male",
         is_married: sonMarried,
+        phone_number: sonPhone.trim() || null,
         sort_order: maxSort + 1,
       })
       .select("id")
@@ -608,6 +610,7 @@ function ChildrenSection({
     setSonName("");
     setMotherName("");
     setSonMarried(false);
+    setSonPhone("");
     setAdding(false);
     router.refresh();
   }
@@ -687,6 +690,23 @@ function ChildrenSection({
             <input type="checkbox" checked={linkToApp} onChange={(e) => setLinkToApp(e.target.checked)} className="w-3.5 h-3.5 accent-[#1D4ED8]" />
             {linkToApp ? "📱 ربط بالتطبيق — يظهر بشجرة العائلة" : "🌐 خاص بالموقع فقط — لا يظهر بالتطبيق"}
           </label>
+
+          {/* رقم الهاتف للدخول — فقط للأعضاء الحقيقيين (المربوطين بالتطبيق) */}
+          {linkToApp && (
+            <div>
+              <span className="text-[10px] font-black text-[#64748B] mb-1 block">📞 هاتف الدخول (اختياري)</span>
+              <input
+                type="tel"
+                inputMode="numeric"
+                value={sonPhone}
+                onChange={(e) => setSonPhone(e.target.value)}
+                placeholder="+965..."
+                dir="ltr"
+                className="w-full px-3 py-2.5 bg-white rounded-lg outline-none focus:ring-2 focus:ring-[#10B981] text-sm"
+              />
+              <span className="text-[10px] text-[#94A3B8] font-bold">يمكّنه من الدخول للتطبيق والموقع برقمه</span>
+            </div>
+          )}
 
           <button
             type="button"
