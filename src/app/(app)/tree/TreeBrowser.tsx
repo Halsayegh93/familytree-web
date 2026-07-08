@@ -1007,12 +1007,15 @@ function FemaleChildren({
         setBusy(false);
         return setErr("خطأ: " + error.message);
       }
-      // نسجّل الأم (اسم البنت) ليظهر عند الابن بالموقع أيضاً
+      // نربط العضو الجديد بأمه (اسم البنت) ونُبقيه ظاهراً في «أبناؤها» بعلامة 📱
       if (ins?.id) {
         await supabase.from("web_relatives").insert({
-          kind: "son",
+          kind: gender,
+          name: name.trim(),
           child_profile_id: ins.id,
           mother_name: parentName,
+          parent_rel_id: parentRelId,
+          parent_woman_id: parentWomanId,
           man_id: husbandProfileId ?? null,
         });
       }
@@ -1078,8 +1081,11 @@ function FemaleChildren({
               <span className="flex-1 min-w-0 font-bold text-xs text-[#0F172A] truncate">
                 {c.name}
                 {c.is_deceased && <span className="mr-1">🕊️</span>}
+                <span className="mr-1 text-[9px]" title={c.child_profile_id ? "عضو بالتطبيق" : "خاص بالموقع"}>
+                  {c.child_profile_id ? "📱" : "🌐"}
+                </span>
               </span>
-              {canEdit && (
+              {canEdit && !c.child_profile_id && (
                 <>
                   <button
                     type="button"
