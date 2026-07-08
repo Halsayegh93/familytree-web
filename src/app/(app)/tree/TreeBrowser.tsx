@@ -1144,9 +1144,10 @@ function DaughterModal({
     const q = husbandSearch.toLowerCase();
     return allMembers.filter((m) => m.full_name.toLowerCase().includes(q)).slice(0, 8);
   }, [husbandSearch, allMembers]);
-  const husbandChosenName = husbandProfileId
-    ? allMembers.find((m) => m.id === husbandProfileId)?.full_name
+  const husbandChosen = husbandProfileId
+    ? allMembers.find((m) => m.id === husbandProfileId) ?? null
     : null;
+  const husbandChosenName = husbandChosen?.full_name ?? null;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -1284,7 +1285,10 @@ function DaughterModal({
               <div className="relative">
                 {husbandChosenName ? (
                   <div className="flex items-center justify-between px-3 py-2.5 bg-[#EFF6FF] rounded-xl">
-                    <span className="font-bold text-sm text-[#0F172A] truncate">{husbandChosenName}</span>
+                    <span className="font-bold text-sm text-[#0F172A] truncate">
+                      {husbandChosenName}
+                      {husbandChosen?.is_deceased && <span className="mr-1 text-[11px] text-[#6B7B8D]">🕊️ متوفى</span>}
+                    </span>
                     <button
                       type="button"
                       onClick={() => setHusbandProfileId(null)}
@@ -1310,10 +1314,12 @@ function DaughterModal({
                             onClick={() => {
                               setHusbandProfileId(m.id);
                               setHusbandSearch("");
+                              if (m.is_deceased) setHusbandDeceased(true);
                             }}
-                            className="w-full text-right px-3 py-2 hover:bg-[#F1F5F9] border-b border-[#E2E8F0] last:border-0 text-sm font-bold text-[#0F172A]"
+                            className="w-full text-right px-3 py-2 hover:bg-[#F1F5F9] border-b border-[#E2E8F0] last:border-0 text-sm font-bold text-[#0F172A] flex items-center justify-between gap-2"
                           >
-                            {m.full_name}
+                            <span className="truncate">{m.full_name}</span>
+                            {m.is_deceased && <span className="text-[10px] text-[#6B7B8D] flex-shrink-0">🕊️ متوفى</span>}
                           </button>
                         ))}
                       </div>
@@ -1576,9 +1582,10 @@ function ExternalHusbandButton({
     const q = familySearch.toLowerCase();
     return allMembers.filter((m) => m.full_name.toLowerCase().includes(q)).slice(0, 8);
   }, [familySearch, allMembers]);
-  const chosenFamilyName = husbandProfileId
-    ? allMembers.find((m) => m.id === husbandProfileId)?.full_name
+  const chosenFamily = husbandProfileId
+    ? allMembers.find((m) => m.id === husbandProfileId) ?? null
     : null;
+  const chosenFamilyName = chosenFamily?.full_name ?? null;
 
   function openModal() {
     setSource(existing?.husband_profile_id ? "family" : "external");
@@ -1721,7 +1728,10 @@ function ExternalHusbandButton({
                   <span className="text-[11px] font-black text-[#64748B] mb-1 block">اختر الزوج من العائلة *</span>
                   {chosenFamilyName ? (
                     <div className="flex items-center justify-between px-3 py-2.5 bg-[#EFF6FF] rounded-xl">
-                      <span className="font-bold text-sm text-[#0F172A] truncate">👪 {chosenFamilyName}</span>
+                      <span className="font-bold text-sm text-[#0F172A] truncate">
+                        👪 {chosenFamilyName}
+                        {chosenFamily?.is_deceased && <span className="mr-1 text-[11px] text-[#6B7B8D]">🕊️ متوفى</span>}
+                      </span>
                       <button type="button" onClick={() => setHusbandProfileId(null)} className="text-[#EF4444] text-xs font-bold flex-shrink-0 mr-2">
                         تغيير
                       </button>
@@ -1731,7 +1741,7 @@ function ExternalHusbandButton({
                       <input
                         value={familySearch}
                         onChange={(e) => setFamilySearch(e.target.value)}
-                        placeholder="ابحث عن الزوج بالاسم..."
+                        placeholder="ابحث عن الزوج بالاسم (يشمل المتوفّين)..."
                         className="ext-input"
                         autoFocus
                       />
@@ -1741,10 +1751,11 @@ function ExternalHusbandButton({
                             <button
                               key={m.id}
                               type="button"
-                              onClick={() => { setHusbandProfileId(m.id); setFamilySearch(""); }}
-                              className="w-full text-right px-3 py-2 hover:bg-[#F1F5F9] border-b border-[#E2E8F0] last:border-0 text-sm font-bold text-[#0F172A]"
+                              onClick={() => { setHusbandProfileId(m.id); setFamilySearch(""); if (m.is_deceased) setIsDeceased(true); }}
+                              className="w-full text-right px-3 py-2 hover:bg-[#F1F5F9] border-b border-[#E2E8F0] last:border-0 text-sm font-bold text-[#0F172A] flex items-center justify-between gap-2"
                             >
-                              {m.full_name}
+                              <span className="truncate">{m.full_name}</span>
+                              {m.is_deceased && <span className="text-[10px] text-[#6B7B8D] flex-shrink-0">🕊️ متوفى</span>}
                             </button>
                           ))}
                         </div>
