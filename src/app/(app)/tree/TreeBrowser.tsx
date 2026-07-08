@@ -667,25 +667,31 @@ function RelationsPanel({
         </Section>
       )}
 
-      {/* الأبناء */}
-      {sons.length > 0 && (
+      {/* الأبناء والبنات — عمودين جنب بعض */}
+      <div className="grid grid-cols-2 gap-2 items-start">
+        {/* الأبناء */}
         <Section title="الأبناء" count={sons.length} icon="👨‍👦" color="#5438DC" compact>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1">
-            {sons.map((c) => (
-              <NodeCard
-                key={c.id}
-                member={c}
-                onClick={() => onFocus(c.id)}
-                childrenCount={childrenCountOf(c.id)}
-                compact
-              />
-            ))}
-          </div>
+          {sons.length > 0 ? (
+            <div className="grid grid-cols-2 gap-1">
+              {sons.map((c) => (
+                <NodeCard
+                  key={c.id}
+                  member={c}
+                  onClick={() => onFocus(c.id)}
+                  childrenCount={childrenCountOf(c.id)}
+                  compact
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-3">
+              <div className="text-2xl mb-1">👦</div>
+              <p className="text-[#94A3B8] text-xs font-bold">لا يوجد أبناء</p>
+            </div>
+          )}
         </Section>
-      )}
 
-      {/* البنات */}
-      {(totalDaughters > 0 || canEditMembers) && (
+        {/* البنات */}
         <Section
           title="البنات"
           count={totalDaughters}
@@ -698,7 +704,7 @@ function RelationsPanel({
                 onClick={() => setAddingDaughter(true)}
                 className="text-[10px] font-black text-white bg-[#EC4899] px-2 py-0.5 rounded-full hover:opacity-90"
               >
-                ➕ إضافة بنت
+                ➕
               </button>
             ) : undefined
           }
@@ -707,13 +713,13 @@ function RelationsPanel({
             <div className="text-center py-3">
               <div className="text-2xl mb-1">👧</div>
               <p className="text-[#94A3B8] text-xs font-bold">
-                لا توجد بنات مسجّلة{canEditMembers ? " — اضغط «➕ إضافة بنت»" : ""}
+                لا توجد بنات{canEditMembers ? " — اضغط ➕" : ""}
               </p>
             </div>
           ) : (
             <div className="space-y-1.5">
               {/* مربعات البنات */}
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-1">
+              <div className="grid grid-cols-2 gap-1">
                 {daughters.map((d) => {
                   const hasHusband =
                     !!internalHusbandName(d.husband_id) || (externalByWoman.get(d.id)?.length ?? 0) > 0;
@@ -791,7 +797,7 @@ function RelationsPanel({
             </div>
           )}
         </Section>
-      )}
+      </div>
 
       {addingDaughter && (
         <DaughterModal
