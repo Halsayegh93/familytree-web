@@ -33,6 +33,7 @@ type WomanMember = {
   husband_id: string | null;
   gender: string | null;
   is_deceased: boolean | null;
+  is_married: boolean | null;
   birth_date: string | null;
   death_date: string | null;
   avatar_url: string | null;
@@ -736,7 +737,8 @@ function RelationsPanel({
               <div className="grid grid-cols-2 gap-1">
                 {daughters.map((d) => {
                   const hasHusband =
-                    !!internalHusbandName(d.husband_id) || (externalByWoman.get(d.id)?.length ?? 0) > 0;
+                    d.is_married ??
+                    (!!internalHusbandName(d.husband_id) || (externalByWoman.get(d.id)?.length ?? 0) > 0);
                   return (
                     <DaughterCard
                       key={"a" + d.id}
@@ -1548,6 +1550,7 @@ function DaughterRow({
     internalHusbandName ??
     extFamilyName ??
     (ext ? [ext.full_name || ext.first_name, ext.family_name].filter(Boolean).join(" ") : null);
+  const married = daughter.is_married ?? !!husbandLabel;
 
   return (
     <div className="bg-white border border-[#F3D9E6] rounded-xl p-2.5">
@@ -1562,7 +1565,9 @@ function DaughterRow({
             <StatusPill deceased={daughter.is_deceased} />
           </div>
           {/* حالة الزواج */}
-          {internalHusbandName ? (
+          {!married ? (
+            <div className="text-[11px] text-[#64748B] font-bold mt-0.5">🙍‍♀️ غير متزوجة</div>
+          ) : internalHusbandName ? (
             <div className="text-[11px] text-[#357DED] font-bold mt-0.5">
               💍 الزوج: {internalHusbandName} <span className="text-[#94A3B8]">(من العائلة · التطبيق)</span>
             </div>
@@ -1579,7 +1584,7 @@ function DaughterRow({
               {ext.is_deceased ? " 🕊️" : ""}
             </div>
           ) : (
-            <div className="text-[11px] text-[#94A3B8] font-semibold mt-0.5">لا يوجد زوج مسجّل</div>
+            <div className="text-[11px] text-[#94A3B8] font-semibold mt-0.5">💍 متزوجة — لا يوجد زوج مسجّل</div>
           )}
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -1592,8 +1597,8 @@ function DaughterRow({
               ✏️
             </button>
           )}
-          {/* إدارة الزوج (عائلة/خارجي) — يظهر إن لم يكن لها زوج من التطبيق */}
-          {!internalHusbandName && (
+          {/* إدارة الزوج — فقط إذا متزوجة وليس لها زوج من التطبيق */}
+          {married && !internalHusbandName && (
             <ExternalHusbandButton
               womanId={daughter.id}
               womanName={daughter.full_name}
@@ -1603,13 +1608,13 @@ function DaughterRow({
           )}
         </div>
       </div>
-      {ext?.notes && (
+      {ext?.notes && married && (
         <div className="text-[11px] text-[#64748B] mt-1.5 pr-14 whitespace-pre-wrap">
           📝 {ext.notes}
         </div>
       )}
-      {/* أبناؤها — فقط إذا متزوجة (لها زوج)، مرتبطون بزوجها */}
-      {husbandLabel && (
+      {/* أبناؤها — فقط إذا متزوجة ولها زوج، مرتبطون بزوجها */}
+      {married && husbandLabel && (
         <FemaleChildren
           parentRelId={null}
           parentWomanId={daughter.id}
@@ -2839,6 +2844,7 @@ function WomanMemberEditModal({
   const [birthDate, setBirthDate] = useState(woman.birth_date ?? "");
   const [deathDate, setDeathDate] = useState(woman.death_date ?? "");
   const [isDeceased, setIsDeceased] = useState(woman.is_deceased ?? false);
+  const [isMarried, setIsMarried] = useState(woman.is_married ?? !!woman.husband_id);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(woman.avatar_url);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -2888,6 +2894,7 @@ function WomanMemberEditModal({
         birth_date: birthDate || null,
         death_date: isDeceased ? deathDate || null : null,
         is_deceased: isDeceased,
+        is_married: isMarried,
         avatar_url: avatarUrl,
       })
       .eq("id", woman.id);
@@ -2994,6 +3001,28 @@ function WomanMemberEditModal({
                 className="w-full px-3 py-2.5 bg-[#F1F5F9] rounded-xl outline-none focus:ring-2 focus:ring-[#DB2777] text-sm"
               />
             </label>
+          )}
+          {/* الحالة الاجتماعية — للبنت */}
+          {role === "daughter" && (
+            <div>
+              <span className="text-[11px] font-black text-[#64748B] mb-1 block">الحالة الاجتماعية</span>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsMarried(false)}
+                  className={`flex-1 h-9 rounded-lg text-xs font-black ${!isMarried ? "bg-[#64748B] text-white" : "bg-[#F1F5F9] text-[#64748B]"}`}
+                >
+                  🙍‍♀️ غير متزوجة
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsMarried(true)}
+                  className={`flex-1 h-9 rounded-lg text-xs font-black ${isMarried ? "bg-[#EC4899] text-white" : "bg-[#F1F5F9] text-[#64748B]"}`}
+                >
+                  💍 متزوجة
+                </button>
+              </div>
+            </div>
           )}
           <p className="text-[10px] text-[#B45309] font-bold bg-[#FEF3C7] rounded-lg p-2">
             📱 سجل من التطبيق (آيفون/أندرويد) — أي تعديل أو حذف هنا يظهر بالتطبيق أيضاً.

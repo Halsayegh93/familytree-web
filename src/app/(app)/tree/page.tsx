@@ -40,7 +40,7 @@ export default async function TreePage() {
     const [{ data: w }, { data: ext }, { data: wr }] = await Promise.all([
       supabase
         .from("women_members")
-        .select("id, first_name, full_name, parent_id, mother_id, husband_id, gender, is_deceased, birth_date, death_date, avatar_url, sort_order")
+        .select("id, first_name, full_name, parent_id, mother_id, husband_id, gender, is_deceased, is_married, birth_date, death_date, avatar_url, sort_order")
         .limit(10000),
       supabase
         .from("external_spouses")
@@ -93,6 +93,7 @@ type WomanRow = {
   husband_id: string | null;
   gender: string | null;
   is_deceased: boolean | null;
+  is_married: boolean | null;
   birth_date: string | null;
   death_date: string | null;
   avatar_url: string | null;
