@@ -515,7 +515,7 @@ export function TreeBrowser({
                 onClick={() => setTab("relations")}
                 icon="👨‍👩‍👧"
                 label="العلاقات"
-                count={daughters.length + webDaughters.length + (mother ? 1 : 0)}
+                count={daughters.length + webDaughters.length}
                 accent="#EC4899"
               />
             </div>
@@ -653,18 +653,6 @@ function RelationsPanel({
           <div className="text-3xl mb-1">🔗</div>
           <p className="text-[#0F172A] font-bold text-sm">لا توجد علاقات مسجّلة لهذا العضو</p>
         </div>
-      )}
-
-      {/* الأم */}
-      {mother && (
-        <Section title="الأم" count={1} icon="👩" color="#DB2777" compact>
-          <WomanRow
-            woman={mother}
-            externals={externalByWoman.get(mother.id) ?? []}
-            canEdit={canEditMembers}
-            role="mother"
-          />
-        </Section>
       )}
 
       {/* الأبناء والبنات — عمودين جنب بعض */}
@@ -1415,49 +1403,6 @@ function DaughterModal({
           </button>
         </div>
       </form>
-    </div>
-  );
-}
-
-// صف امرأة (أم/زوجة) — عرض فقط + عرض الزوج الخارجي إن وُجد
-function WomanRow({
-  woman,
-  externals,
-  canEdit = false,
-  role = "mother",
-}: {
-  woman: WomanMember;
-  externals: ExternalSpouse[];
-  canEdit?: boolean;
-  role?: "wife" | "mother" | "daughter";
-}) {
-  const [editing, setEditing] = useState(false);
-  return (
-    <div className="flex items-center gap-3 bg-[#FDF2F8]/60 border border-[#FCE7F3] rounded-xl p-2">
-      <Avatar name={woman.first_name} url={woman.avatar_url} color="#DB2777" deceased={woman.is_deceased} />
-      <div className="flex-1 min-w-0">
-        <div className="font-black text-sm text-[#0F172A] truncate">
-          {woman.full_name}
-          {woman.is_deceased && <span className="mr-1 text-[11px] text-[#6B7B8D]">🕊️</span>}
-        </div>
-        <SourceBadge kind="app" />
-        {externals.length > 0 && (
-          <div className="text-[11px] text-[#9D174D] font-bold mt-0.5">
-            الزوج (خارج العائلة): {externals.map((e) => e.full_name || e.first_name).join("، ")}
-          </div>
-        )}
-      </div>
-      {canEdit && (
-        <button
-          onClick={() => setEditing(true)}
-          className="flex-shrink-0 h-8 px-2.5 rounded-lg text-[11px] font-black bg-[#EFF6FF] text-[#1D4ED8] hover:bg-[#DBEAFE]"
-        >
-          ✏️ تعديل
-        </button>
-      )}
-      {editing && (
-        <WomanMemberEditModal woman={woman} role={role} onClose={() => setEditing(false)} />
-      )}
     </div>
   );
 }
