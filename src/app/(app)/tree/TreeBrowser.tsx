@@ -980,23 +980,43 @@ function FemaleChildren({
 
     if (linkToApp && !editId) {
       // 📱 ربط بالتطبيق — الطفل يصير عضواً حقيقياً (تحت أبيه إن كان من العائلة، وإلا بدون أب)
-      const underFather = husbandProfileId ? `تحت أبيه «${husbandLabel}»` : "كعضو حقيقي (أبوه خارج العائلة — بدون أب بالشجرة)";
+      const underFather = husbandProfileId ? `تحت أبيه «${husbandLabel}»` : "كعضو حقيقي (أبوه خارج العائلة — يُعرَّف باسم أمه)";
       if (!confirm(`🔗 ربط «${name.trim()}» بالتطبيق ${underFather}؟ راح يظهر بالآيفون/الأندرويد.`)) {
         setBusy(false);
         return;
       }
-      const { error } = await supabase.from("profiles").insert({
-        first_name: name.trim(),
-        full_name: `${name.trim()} ${husbandLabel ?? ""}`.trim(),
-        father_id: husbandProfileId ?? null,
-        role: "member",
-        status: "active",
-        gender: gender === "daughter" ? "female" : "male",
-        is_deceased: deceased,
-        phone_number: childPhone.trim() || null,
-      });
+      // بدون أب من العائلة → نعرّفه باسم أمه ليكون معروفاً بالتطبيق والموقع
+      const fullName = husbandProfileId
+        ? `${name.trim()} ${husbandLabel ?? ""}`.trim()
+        : `${name.trim()} (ابن ${parentName})`;
+      const { data: ins, error } = await supabase
+        .from("profiles")
+        .insert({
+          first_name: name.trim(),
+          full_name: fullName,
+          father_id: husbandProfileId ?? null,
+          role: "member",
+          status: "active",
+          gender: gender === "daughter" ? "female" : "male",
+          is_deceased: deceased,
+          phone_number: childPhone.trim() || null,
+        })
+        .select("id")
+        .single();
+      if (error) {
+        setBusy(false);
+        return setErr("خطأ: " + error.message);
+      }
+      // نسجّل الأم (اسم البنت) ليظهر عند الابن بالموقع أيضاً
+      if (ins?.id) {
+        await supabase.from("web_relatives").insert({
+          kind: "son",
+          child_profile_id: ins.id,
+          mother_name: parentName,
+          man_id: husbandProfileId ?? null,
+        });
+      }
       setBusy(false);
-      if (error) return setErr("خطأ: " + error.message);
       resetForm();
       router.refresh();
       return;
@@ -2395,34 +2415,48 @@ function FocusedMemberCard({
             )}
           </div>
 
-          {/* الزوجات — بجانب اسم العضو (تظهر فقط إذا متزوج) */}
-          {member.is_married === false ? (
-            <div className="mt-2 text-[10px] font-black text-[#64748B]">🙍‍♂️ غير متزوج</div>
-          ) : (
-            (wives.length > 0 || canEditMembers) && (
-              <WivesInline
-                husbandId={member.id}
-                wives={wives}
-                webWives={webWives}
-                canEdit={canEditMembers}
-                motherNamesInUse={motherNamesInUse}
-                familyWomen={familyWomen}
-              />
-            )
-          )}
-
-          {/* أم العضو — اختيار من زوجات أبيه */}
-          {canEditMembers && member.father_id && (
-            <MemberMotherSelect
-              childId={member.id}
-              fatherId={member.father_id}
-              options={myMotherOptions}
-              existing={myMotherLink}
-            />
-          )}
         </div>
       </div>
 
+      {/* ═══ معلومات العائلة — منظّمة تحت الرأس ═══ */}
+      {(canEditMembers || wives.length > 0 || webWives.length > 0) && (
+        <div className="px-4 py-2.5 border-t border-[#F1F5F9] bg-[#FBFCFE] space-y-2">
+          {/* الأم */}
+          {canEditMembers && member.father_id && (
+            <div className="flex items-start gap-2">
+              <span className="text-[10px] font-black text-[#DB2777] w-16 flex-shrink-0 pt-1">👩 الأم</span>
+              <div className="flex-1 min-w-0">
+                <MemberMotherSelect
+                  childId={member.id}
+                  fatherId={member.father_id}
+                  options={myMotherOptions}
+                  existing={myMotherLink}
+                  bare
+                />
+              </div>
+            </div>
+          )}
+          {/* الزوجات */}
+          <div className="flex items-start gap-2">
+            <span className="text-[10px] font-black text-[#DB2777] w-16 flex-shrink-0 pt-1">💍 الزوجات</span>
+            <div className="flex-1 min-w-0">
+              {member.is_married === false ? (
+                <div className="text-[10px] font-black text-[#64748B] pt-1">🙍‍♂️ غير متزوج</div>
+              ) : (
+                <WivesInline
+                  husbandId={member.id}
+                  wives={wives}
+                  webWives={webWives}
+                  canEdit={canEditMembers}
+                  motherNamesInUse={motherNamesInUse}
+                  familyWomen={familyWomen}
+                  bare
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2436,6 +2470,7 @@ function WivesInline({
   canEdit,
   motherNamesInUse,
   familyWomen,
+  bare = false,
 }: {
   husbandId: string;
   wives: WomanMember[];
@@ -2443,14 +2478,15 @@ function WivesInline({
   canEdit: boolean;
   motherNamesInUse: Set<string>;
   familyWomen: WomanMember[];
+  bare?: boolean;
 }) {
   const [editing, setEditing] = useState<WebRelative | "new" | null>(null);
   const [editingReal, setEditingReal] = useState<WomanMember | null>(null);
   const nothing = wives.length === 0 && webWives.length === 0;
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1">
-      <span className="text-[10px] font-black text-[#DB2777] opacity-80">💍 الزوجات:</span>
+    <div className={`flex flex-wrap items-center gap-1 ${bare ? "" : "mt-2"}`}>
+      {!bare && <span className="text-[10px] font-black text-[#DB2777] opacity-80">💍 الزوجات:</span>}
       {nothing && !canEdit && <span className="text-[10px] text-[#94A3B8] font-bold">—</span>}
 
       {/* زوجات التطبيق (women_members) — سجل حقيقي، تعديل كامل */}
@@ -2803,11 +2839,13 @@ function MemberMotherSelect({
   fatherId,
   options,
   existing,
+  bare = false,
 }: {
   childId: string;
   fatherId: string;
   options: WifeOption[];
   existing: WebRelative | null;
+  bare?: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -2833,8 +2871,8 @@ function MemberMotherSelect({
   }
 
   return (
-    <div className="mt-2 flex items-center gap-1 flex-wrap">
-      <span className="text-[10px] font-black text-[#DB2777] opacity-80">👩 الأم:</span>
+    <div className={`flex items-center gap-1 flex-wrap ${bare ? "" : "mt-2"}`}>
+      {!bare && <span className="text-[10px] font-black text-[#DB2777] opacity-80">👩 الأم:</span>}
       {options.length === 0 ? (
         <span className="text-[10px] text-[#94A3B8] font-bold">سجّل زوجات لأبيه أولاً</span>
       ) : (
