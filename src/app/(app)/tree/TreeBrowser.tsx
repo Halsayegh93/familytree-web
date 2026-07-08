@@ -626,6 +626,7 @@ function RelationsPanel({
   childrenCountOf: (id: string) => number;
 }) {
   const [addingDaughter, setAddingDaughter] = useState(false);
+  const [selDaughter, setSelDaughter] = useState<{ id: string; source: "app" | "web" } | null>(null);
   const totalDaughters = daughters.length + webDaughters.length;
   const totalWives = wives.length + webWives.length;
   const nothing =
@@ -708,34 +709,92 @@ function RelationsPanel({
             ) : undefined
           }
         >
-          <div className="space-y-1.5">
-            {/* بنات التطبيق (women_members) */}
-            {daughters.map((d) => (
-              <DaughterRow
-                key={d.id}
-                daughter={d}
-                internalHusbandName={internalHusbandName(d.husband_id)}
-                externals={externalByWoman.get(d.id) ?? []}
-                canEdit={canEditMembers}
-                childrenOfHer={childrenByFemaleReal.get(d.id) ?? []}
-              />
-            ))}
-            {/* بنات الطبقة الويب — قابلة للتعديل */}
-            {webDaughters.map((d) => (
-              <WebDaughterRow
-                key={d.id}
-                daughter={d}
-                manId={focused.id}
-                wifeOptions={wifeOptions}
-                allMembers={allMembers}
-                canEdit={canEditMembers}
-                childrenOfHer={childrenByFemaleWeb.get(d.id) ?? []}
-              />
-            ))}
-            {totalDaughters === 0 && (
-              <p className="text-center text-[#94A3B8] text-xs py-2 font-bold">لا توجد بنات مسجّلة</p>
-            )}
-          </div>
+          {totalDaughters === 0 ? (
+            <div className="text-center py-3">
+              <div className="text-2xl mb-1">👧</div>
+              <p className="text-[#94A3B8] text-xs font-bold">
+                لا توجد بنات مسجّلة{canEditMembers ? " — اضغط «➕ إضافة بنت»" : ""}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {/* مربعات البنات */}
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-1">
+                {daughters.map((d) => {
+                  const hasHusband =
+                    !!internalHusbandName(d.husband_id) || (externalByWoman.get(d.id)?.length ?? 0) > 0;
+                  return (
+                    <DaughterCard
+                      key={"a" + d.id}
+                      name={d.first_name}
+                      avatarUrl={d.avatar_url}
+                      isDeceased={d.is_deceased}
+                      source="app"
+                      hasHusband={hasHusband}
+                      childCount={childrenByFemaleReal.get(d.id)?.length ?? 0}
+                      selected={selDaughter?.source === "app" && selDaughter.id === d.id}
+                      onClick={() =>
+                        setSelDaughter((s) =>
+                          s?.source === "app" && s.id === d.id ? null : { id: d.id, source: "app" }
+                        )
+                      }
+                    />
+                  );
+                })}
+                {webDaughters.map((d) => (
+                  <DaughterCard
+                    key={"w" + d.id}
+                    name={d.name ?? "؟"}
+                    avatarUrl={null}
+                    isDeceased={d.is_deceased}
+                    source="web"
+                    hasHusband={!!d.husband_type}
+                    childCount={childrenByFemaleWeb.get(d.id)?.length ?? 0}
+                    selected={selDaughter?.source === "web" && selDaughter.id === d.id}
+                    onClick={() =>
+                      setSelDaughter((s) =>
+                        s?.source === "web" && s.id === d.id ? null : { id: d.id, source: "web" }
+                      )
+                    }
+                  />
+                ))}
+              </div>
+
+              {/* تفاصيل البنت المختارة */}
+              {selDaughter?.source === "app" &&
+                (() => {
+                  const d = daughters.find((x) => x.id === selDaughter.id);
+                  return d ? (
+                    <DaughterRow
+                      daughter={d}
+                      internalHusbandName={internalHusbandName(d.husband_id)}
+                      externals={externalByWoman.get(d.id) ?? []}
+                      canEdit={canEditMembers}
+                      childrenOfHer={childrenByFemaleReal.get(d.id) ?? []}
+                    />
+                  ) : null;
+                })()}
+              {selDaughter?.source === "web" &&
+                (() => {
+                  const d = webDaughters.find((x) => x.id === selDaughter.id);
+                  return d ? (
+                    <WebDaughterRow
+                      daughter={d}
+                      manId={focused.id}
+                      wifeOptions={wifeOptions}
+                      allMembers={allMembers}
+                      canEdit={canEditMembers}
+                      childrenOfHer={childrenByFemaleWeb.get(d.id) ?? []}
+                    />
+                  ) : null;
+                })()}
+              {!selDaughter && (
+                <p className="text-center text-[10px] text-[#94A3B8] font-bold pt-1">
+                  👆 اضغط على بنت لعرض التفاصيل وتعديل الزوج والأبناء
+                </p>
+              )}
+            </div>
+          )}
         </Section>
       )}
 
@@ -820,13 +879,14 @@ function WebDaughterRow({
       {daughter.notes && (
         <div className="text-[11px] text-[#64748B] mt-1.5 pr-14 whitespace-pre-wrap">📝 {daughter.notes}</div>
       )}
-      {/* أبناؤها — خاص بالموقع */}
+      {/* أبناؤها — خاص بالموقع، مرتبطون بزوجها */}
       <FemaleChildren
         parentRelId={daughter.id}
         parentWomanId={null}
         parentName={daughter.name ?? ""}
         childrenOfHer={childrenOfHer}
         canEdit={canEdit}
+        husbandLabel={husbandName}
       />
       {editing && (
         <DaughterModal
@@ -848,12 +908,14 @@ function FemaleChildren({
   parentName,
   childrenOfHer,
   canEdit,
+  husbandLabel,
 }: {
   parentRelId: string | null;
   parentWomanId: string | null;
   parentName: string;
   childrenOfHer: WebRelative[];
   canEdit: boolean;
+  husbandLabel: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -865,6 +927,7 @@ function FemaleChildren({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const hasHusband = !!husbandLabel;
   if (childrenOfHer.length === 0 && !canEdit) return null;
 
   function resetForm() {
@@ -918,6 +981,17 @@ function FemaleChildren({
 
       {open && (
         <div className="mt-1.5 space-y-1.5">
+          {/* الأب = زوج الأنثى */}
+          {hasHusband ? (
+            <div className="text-[10px] font-black text-[#0369A1] bg-[#E0F2FE] rounded-lg px-2 py-1">
+              👨 الأب (زوجها): {husbandLabel}
+            </div>
+          ) : (
+            <div className="text-[10px] font-bold text-[#B45309] bg-[#FEF3C7] rounded-lg px-2 py-1 flex items-start gap-1">
+              <span>⚠️</span>
+              <span>لازم تسجّل زوجاً لها أولاً — الأبناء يرتبطون بزوج الأنثى.</span>
+            </div>
+          )}
           {childrenOfHer.map((c) => (
             <div key={c.id} className="flex items-center gap-2 bg-[#F0F9FF] rounded-lg px-2 py-1.5">
               <span className="text-sm">{c.kind === "daughter" ? "👧" : "👦"}</span>
@@ -951,10 +1025,10 @@ function FemaleChildren({
             </div>
           ))}
 
-          {canEdit && (
+          {canEdit && hasHusband && (
             <div className="bg-[#F0F9FF] border border-[#BAE6FD] rounded-lg p-2 space-y-1.5">
               <div className="text-[10px] font-black text-[#0369A1]">
-                {editId ? "تعديل ابن" : `➕ إضافة ابن لـ ${parentName}`}
+                {editId ? "تعديل ابن" : `➕ إضافة ابن لـ ${parentName} من ${husbandLabel}`}
               </div>
               <input
                 value={name}
@@ -1358,6 +1432,8 @@ function DaughterRow({
 }) {
   const ext = externals[0] ?? null;
   const [editing, setEditing] = useState(false);
+  const husbandLabel =
+    internalHusbandName ?? (ext ? [ext.full_name || ext.first_name, ext.family_name].filter(Boolean).join(" ") : null);
 
   return (
     <div className="bg-white border border-[#F3D9E6] rounded-xl p-2.5">
@@ -1406,13 +1482,14 @@ function DaughterRow({
           📝 {ext.notes}
         </div>
       )}
-      {/* أبناؤها — خاص بالموقع */}
+      {/* أبناؤها — خاص بالموقع، مرتبطون بزوجها */}
       <FemaleChildren
         parentRelId={null}
         parentWomanId={daughter.id}
         parentName={daughter.full_name}
         childrenOfHer={childrenOfHer}
         canEdit={canEdit}
+        husbandLabel={husbandLabel}
       />
       {editing && (
         <WomanMemberEditModal woman={daughter} role="daughter" onClose={() => setEditing(false)} />
@@ -1686,6 +1763,72 @@ function SourceBadge({ kind }: { kind: "app" | "web" }) {
     >
       🌐 من الموقع
     </span>
+  );
+}
+
+// مربّع بنت مختصر (شبكة) — يُفتح تفاصيله عند الضغط
+function DaughterCard({
+  name,
+  avatarUrl,
+  isDeceased,
+  source,
+  hasHusband,
+  childCount,
+  selected,
+  onClick,
+}: {
+  name: string;
+  avatarUrl: string | null;
+  isDeceased: boolean | null;
+  source: "app" | "web";
+  hasHusband: boolean;
+  childCount: number;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`group relative bg-white rounded-lg border p-1 transition w-full overflow-hidden ${
+        selected ? "border-[#EC4899] ring-2 ring-[#EC4899]/40" : "border-[#E2E8F0] hover:border-[#EC4899]"
+      }`}
+    >
+      <span
+        className="absolute top-0.5 right-0.5 text-[9px]"
+        title={source === "app" ? "من التطبيق" : "من الموقع"}
+      >
+        {source === "app" ? "📱" : "🌐"}
+      </span>
+      <div className="flex flex-col items-center text-center gap-1">
+        <div
+          className={`w-16 h-16 rounded-xl flex items-center justify-center text-white font-black overflow-hidden flex-shrink-0 text-xl ${
+            isDeceased ? "grayscale opacity-70" : ""
+          }`}
+          style={{ background: "linear-gradient(135deg, #EC4899, #DB2777cc)" }}
+        >
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+          ) : (
+            name.charAt(0)
+          )}
+        </div>
+        <div className="w-full min-w-0">
+          <div className={`font-black truncate text-sm ${isDeceased ? "text-[#94A3B8]" : "text-[#0F172A]"}`}>
+            {name}
+          </div>
+          <div className="flex items-center justify-center gap-0.5 flex-wrap">
+            {isDeceased && <span className="text-[9px]">🕊️</span>}
+            {hasHusband && <span className="text-[9px]" title="لها زوج">💍</span>}
+            {childCount > 0 && (
+              <span className="px-1 rounded-full text-[9px] font-black bg-[#0EA5E9]/15 text-[#0369A1]">
+                👶{childCount}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </button>
   );
 }
 
